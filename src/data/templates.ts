@@ -2024,7 +2024,7 @@ const RAW_BLUEPRINTS: TemplateBlueprint[] = [
     bg: "cyber-slate",
     tilt: "flat",
     padding: 44,
-    browserUrl: "app.snapframe.io",
+    browserUrl: "app.snapframy.io",
     desc: "Crisp 16:9 product screenshot sized cleanly for onboarding emails.",
   },
 ];
@@ -2052,7 +2052,7 @@ export const SCENE_TEMPLATES: SceneTemplate[] = RAW_BLUEPRINTS.map((bp, idx) => 
       imageName: `${bp.sample}-sample.svg`,
       activeSampleId: bp.sample,
       frame: bp.frame,
-      browserUrl: bp.browserUrl ?? "app.snapframe.io/analytics",
+      browserUrl: bp.browserUrl ?? "app.snapframy.io/analytics",
       windowTitle: bp.windowTitle ?? "Revenue Overview — Q4",
       aspectRatio: bp.ratio,
       backgroundId: bgPreset.id,

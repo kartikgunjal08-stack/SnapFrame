@@ -20,9 +20,9 @@ export interface AppConfig {
  * sponsor card from this single file.
  */
 export const APP_CONFIG: AppConfig = {
-  appName: "SnapFrame",
-  domainLabel: "snapframe.app",
-  defaultBrowserUrl: "app.snapframe.io/analytics",
+  appName: "SnapFramy",
+  domainLabel: "snapframy.app",
+  defaultBrowserUrl: "app.snapframy.io/analytics",
   defaultWindowTitle: "Revenue Overview — Q4",
   sponsorSlot: {
     enabled: false,

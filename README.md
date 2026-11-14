@@ -1,4 +1,4 @@
-# SnapFrame — Screenshot & Device Mockup Studio
+# SnapFramy — Screenshot & Device Mockup Studio
 
 A production-ready, 100% browser-based screenshot beautifier, 3D device mockup studio, and launch graphic builder built with React, TypeScript, and Tailwind CSS.
 

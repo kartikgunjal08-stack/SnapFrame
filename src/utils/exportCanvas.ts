@@ -21,7 +21,7 @@ export async function exportElementToImage(
 
   const link = document.createElement("a");
   const cleanName = fileNameBase.replace(/\.[^/.]+$/, "").replace(/[^a-zA-Z0-9-_]/g, "-");
-  link.download = `${cleanName || "snapframe-mockup"}-${scale}x.${format}`;
+  link.download = `${cleanName || "snapframy-mockup"}-${scale}x.${format}`;
   link.href = dataUrl;
   document.body.appendChild(link);
   link.click();
