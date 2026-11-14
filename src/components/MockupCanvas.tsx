@@ -2,11 +2,19 @@ import React, { useState } from "react";
 import { Upload, RotateCcw, ZoomIn, ZoomOut, Lock } from "lucide-react";
 import { APP_CONFIG } from "../config";
 import { ASPECT_RATIO_OPTIONS, BACKGROUND_PRESETS } from "../data/presets";
-import { ShadowLevel, StudioState } from "../types/studio";
+import { MockupContentData, ShadowLevel, StudioState } from "../types/studio";
+import { InlineEditable } from "./InlineEditable";
+import { LiveSceneRenderer } from "./LiveSceneRenderer";
 
 interface MockupCanvasProps {
   state: StudioState;
+  isExporting: boolean;
   exportRef: React.RefObject<HTMLDivElement | null>;
+  onUpdate: (patch: Partial<StudioState>) => void;
+  onUpdateMockupData: <K extends keyof MockupContentData>(
+    scene: K,
+    patch: Partial<MockupContentData[K]>
+  ) => void;
   onUploadFile: (file: File) => void;
   onResetStudio: () => void;
 }
@@ -18,12 +26,14 @@ const SHADOW_MAP: Record<ShadowLevel, string> = {
   dramatic: "0 45px 95px -18px rgba(0, 0, 0, 0.72), 0 18px 40px -10px rgba(0, 0, 0, 0.45)",
 };
 
-// Lightweight inline SVG noise pattern so zero external requests are needed during export
 const NOISE_SVG_URI = `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`;
 
 export const MockupCanvas: React.FC<MockupCanvasProps> = ({
   state,
+  isExporting,
   exportRef,
+  onUpdate,
+  onUpdateMockupData,
   onUploadFile,
   onResetStudio,
 }) => {
@@ -45,6 +55,52 @@ export const MockupCanvas: React.FC<MockupCanvasProps> = ({
       ? { backgroundColor: state.customSolidColor }
       : { backgroundImage: activeBg.style };
 
+  const isDarkBackdrop = state.customBgImage
+    ? true
+    : state.useCustomSolid
+      ? (() => {
+          const hex = state.customSolidColor.replace("#", "");
+          if (hex.length !== 6) return true;
+          const r = parseInt(hex.slice(0, 2), 16);
+          const g = parseInt(hex.slice(2, 4), 16);
+          const b = parseInt(hex.slice(4, 6), 16);
+          return (r * 299 + g * 587 + b * 114) / 1000 < 140;
+        })()
+      : activeBg.isDark;
+
+  const getPatternStyle = (): React.CSSProperties | null => {
+    if (state.pattern === "none") return null;
+    if (state.pattern === "dots") {
+      const color = isDarkBackdrop ? "rgba(255,255,255,0.12)" : "rgba(15,23,42,0.12)";
+      return {
+        backgroundImage: `radial-gradient(${color} 1.15px, transparent 1.15px)`,
+        backgroundSize: "18px 18px",
+      };
+    }
+    if (state.pattern === "grid") {
+      const color = isDarkBackdrop ? "rgba(255,255,255,0.06)" : "rgba(15,23,42,0.06)";
+      return {
+        backgroundImage: `linear-gradient(to right, ${color} 1px, transparent 1px), linear-gradient(to bottom, ${color} 1px, transparent 1px)`,
+        backgroundSize: "34px 34px",
+      };
+    }
+    if (state.pattern === "spotlight") {
+      const color = isDarkBackdrop ? "rgba(255,255,255,0.16)" : "rgba(255,255,255,0.55)";
+      return {
+        backgroundImage: `radial-gradient(circle at 50% 42%, ${color} 0%, transparent 66%)`,
+      };
+    }
+    if (state.pattern === "rings") {
+      const color = isDarkBackdrop ? "rgba(255,255,255,0.07)" : "rgba(15,23,42,0.07)";
+      return {
+        backgroundImage: `repeating-radial-gradient(circle at 50% 50%, transparent 0px, transparent 44px, ${color} 45px, transparent 46px)`,
+      };
+    }
+    return null;
+  };
+
+  const patternStyle = getPatternStyle();
+
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragging(false);
@@ -64,7 +120,30 @@ export const MockupCanvas: React.FC<MockupCanvasProps> = ({
   };
 
   const isPhone = state.frame === "iphone";
+  const isTablet = state.frame === "tablet";
+  const isGlass = state.frame === "glass";
   const innerRadius = Math.max(0, state.borderRadius - 2);
+
+  const renderScreenContent = (extraClassName = "") => {
+    if (state.activeSampleId) {
+      return (
+        <LiveSceneRenderer
+          sampleId={state.activeSampleId}
+          data={state.mockupData}
+          isExporting={isExporting}
+          onUpdateData={onUpdateMockupData}
+        />
+      );
+    }
+    return (
+      <img
+        src={state.imageSrc}
+        alt="Screenshot mockup preview"
+        referrerPolicy="no-referrer"
+        className={`w-full h-auto block ${extraClassName}`}
+      />
+    );
+  };
 
   const renderFrameChrome = () => {
     if (state.frame === "macos-dark") {
@@ -75,9 +154,11 @@ export const MockupCanvas: React.FC<MockupCanvasProps> = ({
             <span className="w-3 h-3 rounded-full bg-[#FFBD2E]" />
             <span className="w-3 h-3 rounded-full bg-[#27C93F]" />
           </div>
-          <span className="text-[11px] font-medium text-zinc-400 truncate max-w-[260px]">
-            {state.windowTitle || APP_CONFIG.defaultWindowTitle}
-          </span>
+          <InlineEditable
+            value={state.windowTitle || APP_CONFIG.defaultWindowTitle}
+            onChange={(val) => onUpdate({ windowTitle: val })}
+            className="text-[11px] font-medium text-zinc-400 truncate max-w-[260px]"
+          />
           <div className="w-10" />
         </div>
       );
@@ -91,9 +172,12 @@ export const MockupCanvas: React.FC<MockupCanvasProps> = ({
             <span className="w-3 h-3 rounded-full bg-[#FFBD2E]" />
             <span className="w-3 h-3 rounded-full bg-[#27C93F]" />
           </div>
-          <span className="text-[11px] font-medium text-zinc-600 truncate max-w-[260px]">
-            {state.windowTitle || APP_CONFIG.defaultWindowTitle}
-          </span>
+          <InlineEditable
+            lightSurface
+            value={state.windowTitle || APP_CONFIG.defaultWindowTitle}
+            onChange={(val) => onUpdate({ windowTitle: val })}
+            className="text-[11px] font-medium text-zinc-600 truncate max-w-[260px]"
+          />
           <div className="w-10" />
         </div>
       );
@@ -110,7 +194,11 @@ export const MockupCanvas: React.FC<MockupCanvasProps> = ({
           <div className="flex-1 flex items-center justify-center">
             <div className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-white/[0.05] border border-white/[0.06] text-[11px] text-zinc-300 font-mono-tabular max-w-[280px] w-full justify-center">
               <Lock className="w-2.5 h-2.5 text-zinc-400 shrink-0" />
-              <span className="truncate">{state.browserUrl || APP_CONFIG.defaultBrowserUrl}</span>
+              <InlineEditable
+                value={state.browserUrl || APP_CONFIG.defaultBrowserUrl}
+                onChange={(val) => onUpdate({ browserUrl: val })}
+                className="truncate"
+              />
             </div>
           </div>
           <div className="w-10 shrink-0" />
@@ -123,23 +211,45 @@ export const MockupCanvas: React.FC<MockupCanvasProps> = ({
 
   const renderCaption = () => {
     if (!state.showCaption) return null;
+    const eyebrowColor = state.captionLightText ? "text-white/70" : "text-zinc-500";
     const textColor = state.captionLightText ? "text-white" : "text-zinc-900";
     const subColor = state.captionLightText ? "text-white/75" : "text-zinc-600";
 
     return (
-      <div className="text-center max-w-xl mx-auto px-4 select-none">
-        {state.captionTitle && (
-          <h2
-            className={`font-display font-bold tracking-tight leading-tight text-balance ${textColor}`}
-            style={{ fontSize: "clamp(1.15rem, 2.2vw, 1.65rem)" }}
-          >
-            {state.captionTitle}
-          </h2>
+      <div className="text-center max-w-xl mx-auto px-4 select-none space-y-1">
+        {(state.captionEyebrow || !isExporting) && (
+          <div>
+            <InlineEditable
+              lightSurface={!state.captionLightText}
+              value={state.captionEyebrow}
+              placeholder="Add eyebrow..."
+              onChange={(val) => onUpdate({ captionEyebrow: val })}
+              className={`text-[11px] font-semibold uppercase tracking-[0.14em] inline-block ${eyebrowColor}`}
+            />
+          </div>
         )}
-        {state.captionSubtitle && (
-          <p className={`mt-1.5 text-xs sm:text-sm leading-relaxed ${subColor}`}>
-            {state.captionSubtitle}
-          </p>
+        <div>
+          <InlineEditable
+            as="h2"
+            lightSurface={!state.captionLightText}
+            value={state.captionTitle}
+            placeholder="Click to add headline..."
+            onChange={(val) => onUpdate({ captionTitle: val })}
+            className={`font-display font-bold tracking-tight leading-tight text-balance inline-block ${textColor}`}
+            style={{ fontSize: "clamp(1.15rem, 2.2vw, 1.65rem)" }}
+          />
+        </div>
+        {(state.captionSubtitle || !isExporting) && (
+          <div>
+            <InlineEditable
+              as="p"
+              lightSurface={!state.captionLightText}
+              value={state.captionSubtitle}
+              placeholder="Click to add subtitle..."
+              onChange={(val) => onUpdate({ captionSubtitle: val })}
+              className={`text-xs sm:text-sm leading-relaxed inline-block ${subColor}`}
+            />
+          </div>
         )}
       </div>
     );
@@ -152,31 +262,27 @@ export const MockupCanvas: React.FC<MockupCanvasProps> = ({
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
     >
-      {/* Subtle Workspace Sub-Toolbar */}
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#1E1E24] bg-[#0D0D10]/90 backdrop-blur-sm z-10">
-        <div className="flex items-center gap-3 text-xs text-zinc-400">
-          <span className="truncate max-w-[200px] font-medium text-zinc-300">
-            {state.imageName}
+      {/* Minimal Stage Sub-Toolbar */}
+      <div className="flex items-center justify-between px-4 py-2 border-b border-[#1E1E24] bg-[#0D0D10]/90 backdrop-blur-sm z-10">
+        <div className="flex items-center gap-2.5 text-xs text-zinc-400 min-w-0">
+          <span className="font-mono-tabular text-zinc-300 whitespace-nowrap">
+            {activeRatio?.label}
           </span>
           <span aria-hidden="true" className="text-zinc-600">
             ·
           </span>
-          <span className="font-mono-tabular whitespace-nowrap">
-            {activeRatio?.label} ({activeRatio?.platform})
-          </span>
-          <span aria-hidden="true" className="hidden sm:inline text-zinc-600">
-            ·
-          </span>
-          <span className="hidden sm:inline text-zinc-500 whitespace-nowrap">
-            Drop image or Ctrl+V to paste
+          <span className="text-zinc-400 truncate">
+            {state.activeSampleId
+              ? "Click any text or chart on mockup to edit"
+              : `${state.imageName} · Drop image or Ctrl+V`}
           </span>
         </div>
 
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex items-center gap-1 shrink-0">
           <button
             type="button"
             onClick={() => setStageZoom((z) => Math.max(60, z - 10))}
-            className="p-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors"
+            className="p-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
             title="Zoom out preview"
           >
             <ZoomOut className="w-3.5 h-3.5" />
@@ -187,7 +293,7 @@ export const MockupCanvas: React.FC<MockupCanvasProps> = ({
           <button
             type="button"
             onClick={() => setStageZoom((z) => Math.min(120, z + 10))}
-            className="p-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors"
+            className="p-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
             title="Zoom in preview"
           >
             <ZoomIn className="w-3.5 h-3.5" />
@@ -199,7 +305,7 @@ export const MockupCanvas: React.FC<MockupCanvasProps> = ({
               setStageZoom(100);
               onResetStudio();
             }}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors whitespace-nowrap shrink-0"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
           >
             <RotateCcw className="w-3 h-3" />
             Reset
@@ -221,12 +327,17 @@ export const MockupCanvas: React.FC<MockupCanvasProps> = ({
               ...backgroundStyle,
               aspectRatio: activeRatio?.ratioValue || undefined,
               padding: `${state.padding}px`,
-              width: state.aspectRatio === "4:5" ? "560px" : state.aspectRatio === "1:1" ? "640px" : "780px",
+              width:
+                state.aspectRatio === "4:5"
+                  ? "560px"
+                  : state.aspectRatio === "1:1"
+                    ? "640px"
+                    : "780px",
               maxWidth: "100%",
               borderRadius: "4px",
             }}
           >
-            {/* Optional Film Grain Texture */}
+            {/* Film Grain Overlay */}
             {state.grainOpacity > 0 && (
               <div
                 aria-hidden="true"
@@ -235,6 +346,15 @@ export const MockupCanvas: React.FC<MockupCanvasProps> = ({
                   backgroundImage: NOISE_SVG_URI,
                   opacity: state.grainOpacity / 100,
                 }}
+              />
+            )}
+
+            {/* Backdrop Pattern Overlay */}
+            {patternStyle && (
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0"
+                style={patternStyle}
               />
             )}
 
@@ -247,13 +367,12 @@ export const MockupCanvas: React.FC<MockupCanvasProps> = ({
             <div
               className="relative z-10 flex items-center justify-center transition-transform duration-200 ease-out"
               style={{
-                width: isPhone ? "250px" : `${state.scale}%`,
-                transform: `perspective(1400px) rotateX(${state.rotateX}deg) rotateY(${state.rotateY}deg)`,
+                width: isPhone ? "258px" : `${state.scale}%`,
+                transform: `perspective(1400px) rotateX(${state.rotateX}deg) rotateY(${state.rotateY}deg) rotateZ(${state.rotateZ}deg)`,
                 transformStyle: "preserve-3d",
               }}
             >
               {isPhone ? (
-                /* Realistic Titanium iPhone Bezel */
                 <div
                   className="relative w-full bg-[#121215] p-[10px] border border-white/15"
                   style={{
@@ -261,24 +380,48 @@ export const MockupCanvas: React.FC<MockupCanvasProps> = ({
                     boxShadow: SHADOW_MAP[state.shadow],
                   }}
                 >
-                  {/* Dynamic Island */}
-                  <div className="absolute top-[18px] left-1/2 -translate-x-1/2 w-[74px] h-[20px] bg-black rounded-full z-20 flex items-center justify-end px-2">
+                  <div className="absolute top-[16px] left-1/2 -translate-x-1/2 w-[72px] h-[18px] bg-black rounded-full z-20 flex items-center justify-end px-2 pointer-events-none">
                     <span className="w-2 h-2 rounded-full bg-[#171A26] border border-white/10" />
                   </div>
                   <div
-                    className="overflow-hidden bg-black"
+                    className="overflow-hidden bg-[#090B10]"
                     style={{ borderRadius: `${Math.max(22, state.borderRadius + 8)}px` }}
                   >
-                    <img
-                      src={state.imageSrc}
-                      alt="Device mockup preview"
-                      referrerPolicy="no-referrer"
-                      className="w-full h-auto block object-cover"
-                    />
+                    {renderScreenContent("object-cover")}
+                  </div>
+                </div>
+              ) : isTablet ? (
+                <div
+                  className="relative w-full bg-[#101115] p-[14px] border border-white/15"
+                  style={{
+                    borderRadius: `${Math.max(22, state.borderRadius + 10)}px`,
+                    boxShadow: SHADOW_MAP[state.shadow],
+                  }}
+                >
+                  <div className="absolute top-[5px] left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-[#1F2433] border border-white/15 pointer-events-none" />
+                  <div
+                    className="overflow-hidden bg-black border border-white/[0.06]"
+                    style={{ borderRadius: `${Math.max(12, state.borderRadius + 2)}px` }}
+                  >
+                    {renderScreenContent()}
+                  </div>
+                </div>
+              ) : isGlass ? (
+                <div
+                  className="w-full p-2.5 sm:p-3 bg-white/[0.08] backdrop-blur-md border border-white/25"
+                  style={{
+                    borderRadius: `${state.borderRadius + 8}px`,
+                    boxShadow: SHADOW_MAP[state.shadow],
+                  }}
+                >
+                  <div
+                    className="overflow-hidden border border-white/15 bg-[#0B0D12]"
+                    style={{ borderRadius: `${state.borderRadius}px` }}
+                  >
+                    {renderScreenContent()}
                   </div>
                 </div>
               ) : (
-                /* Desktop / Window / Card Frame */
                 <div
                   className="w-full overflow-hidden border border-white/[0.12] bg-[#0B0D12]"
                   style={{
@@ -294,12 +437,7 @@ export const MockupCanvas: React.FC<MockupCanvasProps> = ({
                       borderBottomRightRadius: `${innerRadius}px`,
                     }}
                   >
-                    <img
-                      src={state.imageSrc}
-                      alt="Screenshot mockup preview"
-                      referrerPolicy="no-referrer"
-                      className="w-full h-auto block"
-                    />
+                    {renderScreenContent()}
                   </div>
                 </div>
               )}

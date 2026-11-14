@@ -34,34 +34,34 @@ export const GuideView: React.FC<GuideViewProps> = ({ onOpenStudio }) => {
           <div className="p-6 rounded-xl bg-[#111115] border border-[#22222A]">
             <p className="text-xs font-mono-tabular text-zinc-500 mb-2">01. Instant Input</p>
             <h2 className="font-display text-base font-semibold text-white">
-              Paste or Drop Any Screen
+              Click to Edit — Or Drop a Screen
             </h2>
             <p className="mt-2 text-xs text-zinc-400 leading-relaxed">
-              Press <code className="font-mono-tabular text-zinc-200">Ctrl+V</code> (or{" "}
-              <code className="font-mono-tabular text-zinc-200">Cmd+V</code>) anywhere in the app
-              to load a clipboard screenshot, or drag a PNG, JPG, WebP, or SVG onto the stage.
+              Click any text, metric, headline, or chart right on the canvas to edit it directly
+              with your mouse — or paste (<code className="font-mono-tabular text-zinc-200">Ctrl+V</code>)
+              or drop any local screenshot onto the stage.
             </p>
           </div>
 
           <div className="p-6 rounded-xl bg-[#111115] border border-[#22222A]">
             <p className="text-xs font-mono-tabular text-zinc-500 mb-2">02. Device & Depth</p>
             <h2 className="font-display text-base font-semibold text-white">
-              Frames & 3D Perspective
+              7 Frames, Patterns & 3D
             </h2>
             <p className="mt-2 text-xs text-zinc-400 leading-relaxed">
-              Switch between macOS Dark/Light windows, editable Browser bars, and titanium iPhone
-              bezels. Pair with mesh gradients, film grain, and fine X/Y tilt controls.
+              Choose macOS Dark/Light, Browser, iPhone, Tablet, Frosted Glass, or Frameless cards.
+              Layer 28 gradients with Dot, Grid, Glow, or Ring patterns and X/Y/Z 3D tilt controls.
             </p>
           </div>
 
           <div className="p-6 rounded-xl bg-[#111115] border border-[#22222A]">
             <p className="text-xs font-mono-tabular text-zinc-500 mb-2">03. Clean Output</p>
             <h2 className="font-display text-base font-semibold text-white">
-              1x, 2x & 3x Export Ready
+              152 Templates & 3x Export
             </h2>
             <p className="mt-2 text-xs text-zinc-400 leading-relaxed">
-              Export clean, watermark-free PNG or JPEG files sized for X (`16:9`), Product Hunt
-              (`16:10`), LinkedIn (`4:5`), and Instagram (`1:1`), or copy directly to clipboard.
+              Start from 152 templates across 8 categories, customize eyebrow & headline overlays,
+              and export clean 1x, 2x, or 3x PNG/JPEG files sized for X, Product Hunt, and LinkedIn.
             </p>
           </div>
         </div>

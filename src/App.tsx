@@ -6,7 +6,7 @@ import { RightInspector } from "./components/RightInspector";
 import { TemplatesView } from "./components/TemplatesView";
 import { APP_CONFIG } from "./config";
 import { INITIAL_STUDIO_STATE, SAMPLE_MOCKUPS, SceneTemplate } from "./data/presets";
-import { AppView, SampleId, StudioState } from "./types/studio";
+import { AppView, MockupContentData, SampleId, StudioState } from "./types/studio";
 import { copyElementToClipboard, exportElementToImage } from "./utils/exportCanvas";
 
 export default function App() {
@@ -29,6 +29,22 @@ export default function App() {
     setState((prev) => ({ ...prev, ...patch }));
   }, []);
 
+  const updateMockupData = useCallback(
+    <K extends keyof MockupContentData>(scene: K, patch: Partial<MockupContentData[K]>) => {
+      setState((prev) => ({
+        ...prev,
+        mockupData: {
+          ...prev.mockupData,
+          [scene]: {
+            ...prev.mockupData[scene],
+            ...patch,
+          },
+        },
+      }));
+    },
+    []
+  );
+
   const handleUploadFile = useCallback(
     (file: File) => {
       const reader = new FileReader();
@@ -38,6 +54,7 @@ export default function App() {
             ...prev,
             imageSrc: reader.result as string,
             imageName: file.name || "uploaded-screenshot.png",
+            activeSampleId: null,
           }));
           setActiveView("studio");
           showNotice(`Loaded ${file.name || "image"} onto canvas`);
@@ -51,6 +68,10 @@ export default function App() {
   // Global clipboard paste support (Ctrl+V / Cmd+V)
   useEffect(() => {
     const handlePaste = (e: ClipboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) {
+        return;
+      }
       const items = e.clipboardData?.items;
       if (!items) return;
       for (let i = 0; i < items.length; i++) {
@@ -73,6 +94,7 @@ export default function App() {
     updateState({
       imageSrc: sample.src,
       imageName: `${sampleId}-sample.svg`,
+      activeSampleId: sampleId,
       frame: sample.recommendedFrame,
     });
   };
@@ -95,15 +117,14 @@ export default function App() {
 
     try {
       setIsExporting(true);
+      await new Promise((r) => setTimeout(r, 30));
       await exportElementToImage(
         exportRef.current,
         state.exportFormat,
         state.exportScale,
         state.imageName
       );
-      showNotice(
-        `Exported ${state.exportScale}x ${state.exportFormat.toUpperCase()} image`
-      );
+      showNotice(`Exported ${state.exportScale}x ${state.exportFormat.toUpperCase()} image`);
     } catch {
       showNotice("Export failed. Try lowering export scale to 2x.", "error");
     } finally {
@@ -115,6 +136,7 @@ export default function App() {
     if (!exportRef.current) return;
     try {
       setIsExporting(true);
+      await new Promise((r) => setTimeout(r, 30));
       await copyElementToClipboard(exportRef.current, state.exportScale);
       setCopiedSuccess(true);
       showNotice("Mockup copied to clipboard");
@@ -136,7 +158,6 @@ export default function App() {
     <div className="min-h-screen lg:h-screen flex flex-col bg-[#0A0A0C] text-[#F4F4F6] lg:overflow-hidden">
       {/* Top Bar — Strict 3-Zone Contract */}
       <header className="h-14 shrink-0 flex items-center justify-between gap-8 px-5 border-b border-[#1E1E24] bg-[#0B0B0E]">
-        {/* Zone 1: Single text element wordmark */}
         <button
           type="button"
           onClick={() => setActiveView("studio")}
@@ -145,7 +166,6 @@ export default function App() {
           {APP_CONFIG.appName}
         </button>
 
-        {/* Zone 2: Clean single-line nav links */}
         <nav className="hidden md:flex items-center gap-7 text-sm font-medium">
           {navItems.map((item) => {
             const active = activeView === item.id;
@@ -166,7 +186,6 @@ export default function App() {
           })}
         </nav>
 
-        {/* Zone 3: 1 primary action */}
         <div className="flex items-center shrink-0">
           <button
             type="button"
@@ -179,7 +198,7 @@ export default function App() {
         </div>
       </header>
 
-      {/* Mobile Navigation Strip (visible below md) */}
+      {/* Mobile Navigation Strip */}
       <div className="flex md:hidden items-center gap-1 px-4 py-2 border-b border-[#1E1E24] bg-[#0E0E12] overflow-x-auto">
         {navItems.map((item) => (
           <button
@@ -209,7 +228,10 @@ export default function App() {
           />
           <MockupCanvas
             state={state}
+            isExporting={isExporting}
             exportRef={exportRef}
+            onUpdate={updateState}
+            onUpdateMockupData={updateMockupData}
             onUploadFile={handleUploadFile}
             onResetStudio={() => setState(INITIAL_STUDIO_STATE)}
           />
@@ -224,13 +246,9 @@ export default function App() {
         </main>
       )}
 
-      {activeView === "templates" && (
-        <TemplatesView onApplyTemplate={handleApplyTemplate} />
-      )}
+      {activeView === "templates" && <TemplatesView onApplyTemplate={handleApplyTemplate} />}
 
-      {activeView === "guide" && (
-        <GuideView onOpenStudio={() => setActiveView("studio")} />
-      )}
+      {activeView === "guide" && <GuideView onOpenStudio={() => setActiveView("studio")} />}
 
       {/* Non-blocking Toast Feedback */}
       {notice && (

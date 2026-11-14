@@ -1,4 +1,5 @@
 import { AspectRatioOption, BackgroundPreset, SampleId, StudioState } from "../types/studio";
+import { DEFAULT_MOCKUP_DATA } from "../utils/sampleSvgBuilder";
 
 export const BACKGROUND_PRESETS: BackgroundPreset[] = [
   {
@@ -190,6 +191,38 @@ export const BACKGROUND_PRESETS: BackgroundPreset[] = [
     swatch: "linear-gradient(135deg, #34d399 0%, #3b82f6 100%)",
     isDark: true,
   },
+  {
+    id: "violet-nebula",
+    name: "Royal Dusk",
+    style:
+      "radial-gradient(at 20% 25%, #4f46e5 0px, transparent 55%), radial-gradient(at 80% 80%, #0ea5e9 0px, transparent 55%), linear-gradient(135deg, #0b1120 0%, #1e1b4b 100%)",
+    swatch: "linear-gradient(135deg, #4f46e5 0%, #0ea5e9 100%)",
+    isDark: true,
+  },
+  {
+    id: "mint-linen",
+    name: "Mint Linen",
+    style:
+      "radial-gradient(at 20% 20%, #d1fae5 0px, transparent 55%), radial-gradient(at 85% 80%, #e0f2fe 0px, transparent 55%), linear-gradient(135deg, #ecfdf5 0%, #f1f5f9 100%)",
+    swatch: "linear-gradient(135deg, #a7f3d0 0%, #e0f2fe 100%)",
+    isDark: false,
+  },
+  {
+    id: "bronze-obsidian",
+    name: "Bronze Obsidian",
+    style:
+      "radial-gradient(at 75% 20%, #b45309 0px, transparent 52%), radial-gradient(at 18% 85%, #292524 0px, transparent 55%), linear-gradient(135deg, #0c0a09 0%, #292524 100%)",
+    swatch: "linear-gradient(135deg, #d97706 0%, #1c1917 100%)",
+    isDark: true,
+  },
+  {
+    id: "skyline-ice",
+    name: "Skyline Ice",
+    style:
+      "radial-gradient(at 25% 20%, #bae6fd 0px, transparent 55%), radial-gradient(at 85% 85%, #ddd6fe 0px, transparent 55%), linear-gradient(135deg, #f0f9ff 0%, #f5f3ff 100%)",
+    swatch: "linear-gradient(135deg, #bae6fd 0%, #ddd6fe 100%)",
+    isDark: false,
+  },
 ];
 
 export const ASPECT_RATIO_OPTIONS: AspectRatioOption[] = [
@@ -368,6 +401,120 @@ export const SAMPLE_MOCKUPS: Record<SampleId, { label: string; src: string; reco
   <text x="72" y="498" fill="#3FB950" font-family="monospace" font-size="16">PASS  Exported 3600×2250px lossless PNG in 142ms (0 server calls)</text>
 </svg>`),
   },
+  ecommerce: {
+    label: "Storefront UI",
+    recommendedFrame: "browser",
+    src: svgToDataUri(`
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760" fill="none">
+  <rect width="1200" height="760" fill="#FAFAF9"/>
+  <rect x="0" y="0" width="1200" height="72" fill="#FFFFFF"/>
+  <line x1="0" y1="72" x2="1200" y2="72" stroke="#E7E5E4"/>
+  <text x="56" y="44" fill="#1C1917" font-family="sans-serif" font-size="20" font-weight="700">ATELIER NORD</text>
+  <text x="450" y="43" fill="#57534E" font-family="sans-serif" font-size="14" font-weight="500">New Arrivals</text>
+  <text x="580" y="43" fill="#57534E" font-family="sans-serif" font-size="14" font-weight="500">Lighting</text>
+  <text x="678" y="43" fill="#57534E" font-family="sans-serif" font-size="14" font-weight="500">Objects</text>
+  <rect x="1030" y="20" width="114" height="34" rx="8" fill="#1C1917"/>
+  <text x="1060" y="42" fill="#FFFFFF" font-family="sans-serif" font-size="13" font-weight="600">Cart (2)</text>
+
+  <rect x="56" y="108" width="540" height="596" rx="18" fill="#E7E5E4"/>
+  <rect x="116" y="170" width="420" height="440" rx="14" fill="#D6D3D1"/>
+  <circle cx="326" cy="340" r="110" fill="#FAFAF9"/>
+  <rect x="266" y="430" width="120" height="120" rx="12" fill="#44403C"/>
+  <text x="88" y="670" fill="#57534E" font-family="sans-serif" font-size="13" font-weight="600">ARCHITECTURAL SERIES · EDITION 04</text>
+
+  <text x="644" y="156" fill="#78716C" font-family="sans-serif" font-size="13" font-weight="600">STUDIO LIGHTING · IN STOCK</text>
+  <text x="644" y="206" fill="#1C1917" font-family="sans-serif" font-size="38" font-weight="700">Kanso Ceramic Lamp</text>
+  <text x="644" y="252" fill="#1C1917" font-family="sans-serif" font-size="26" font-weight="600">$280.00</text>
+  <text x="762" y="250" fill="#16A34A" font-family="sans-serif" font-size="14" font-weight="600">Free worldwide shipping</text>
+
+  <text x="644" y="306" fill="#57534E" font-family="sans-serif" font-size="15">Hand-thrown matte stoneware base paired with a warm diffused</text>
+  <text x="644" y="330" fill="#57534E" font-family="sans-serif" font-size="15">opal glass shade. Dimmable 2700K warm architectural LED.</text>
+
+  <text x="644" y="388" fill="#1C1917" font-family="sans-serif" font-size="13" font-weight="600">FINISH</text>
+  <circle cx="662" cy="422" r="16" fill="#F5F5F4" stroke="#1C1917" stroke-width="2"/>
+  <circle cx="706" cy="422" r="16" fill="#44403C"/>
+  <circle cx="750" cy="422" r="16" fill="#A8A29E"/>
+
+  <rect x="644" y="476" width="496" height="54" rx="10" fill="#1C1917"/>
+  <text x="832" y="509" fill="#FFFFFF" font-family="sans-serif" font-size="15" font-weight="600">Add to Bag — $280</text>
+
+  <rect x="644" y="556" width="240" height="92" rx="12" fill="#FFFFFF" stroke="#E7E5E4"/>
+  <text x="668" y="592" fill="#78716C" font-family="sans-serif" font-size="12">CONVERSION RATE</text>
+  <text x="668" y="626" fill="#1C1917" font-family="sans-serif" font-size="24" font-weight="700">4.82% (+1.1%)</text>
+
+  <rect x="900" y="556" width="240" height="92" rx="12" fill="#FFFFFF" stroke="#E7E5E4"/>
+  <text x="924" y="592" fill="#78716C" font-family="sans-serif" font-size="12">TODAY REVENUE</text>
+  <text x="924" y="626" fill="#1C1917" font-family="sans-serif" font-size="24" font-weight="700">$6,440</text>
+</svg>`),
+  },
+  ai: {
+    label: "AI Copilot",
+    recommendedFrame: "glass",
+    src: svgToDataUri(`
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760" fill="none">
+  <rect width="1200" height="760" fill="#090A0F"/>
+  <rect x="0" y="0" width="250" height="760" fill="#0E1017"/>
+  <line x1="250" y1="0" x2="250" y2="760" stroke="#1E2230"/>
+  <text x="28" y="48" fill="#F8FAFC" font-family="sans-serif" font-size="17" font-weight="700">ContextAgent</text>
+  <rect x="24" y="76" width="202" height="38" rx="9" fill="#1D4ED8"/>
+  <text x="66" y="100" fill="#FFFFFF" font-family="sans-serif" font-size="13" font-weight="600">+ New Thread</text>
+  <text x="28" y="154" fill="#64748B" font-family="sans-serif" font-size="11" font-weight="600">RECENT WORKFLOWS</text>
+  <rect x="20" y="170" width="210" height="36" rx="8" fill="#161A26"/>
+  <text x="34" y="193" fill="#E2E8F0" font-family="sans-serif" font-size="13">Q4 Churn Root-Cause</text>
+  <text x="34" y="232" fill="#94A3B8" font-family="sans-serif" font-size="13">SQL Cohort Builder</text>
+  <text x="34" y="268" fill="#94A3B8" font-family="sans-serif" font-size="13">Landing Copy Audit</text>
+
+  <rect x="310" y="54" width="830" height="78" rx="14" fill="#121520" stroke="#22283A"/>
+  <text x="336" y="88" fill="#94A3B8" font-family="sans-serif" font-size="12" font-weight="600">YOU ASKED</text>
+  <text x="336" y="114" fill="#F8FAFC" font-family="sans-serif" font-size="15">Summarize why Pro upgrades jumped 24% after adding 1-click exports.</text>
+
+  <rect x="310" y="158" width="830" height="432" rx="16" fill="#0F131D" stroke="#252C40"/>
+  <text x="338" y="198" fill="#60A5FA" font-family="sans-serif" font-size="13" font-weight="700">COPILOT ANALYSIS · 14,200 SESSIONS SCANNED</text>
+  <text x="338" y="240" fill="#E2E8F0" font-family="sans-serif" font-size="16" font-weight="600">1. Time-to-value dropped from 4m 10s to 38 seconds</text>
+  <text x="338" y="268" fill="#94A3B8" font-family="sans-serif" font-size="14">Users who exported a graphic within their first minute converted at 3.4x higher rates.</text>
+
+  <rect x="338" y="302" width="774" height="148" rx="12" fill="#090C12" stroke="#1E2536"/>
+  <text x="362" y="336" fill="#79C0FF" font-family="monospace" font-size="14">SELECT cohort_week, COUNT(*) AS exports, AVG(upgrade_rate) AS conv</text>
+  <text x="362" y="364" fill="#E2E8F0" font-family="monospace" font-size="14">FROM studio_events WHERE action = 'export_3x_png'</text>
+  <text x="362" y="392" fill="#34D399" font-family="monospace" font-size="14">-- Result: +24.3% lift across 1,840 organic workspaces</text>
+  <text x="362" y="424" fill="#94A3B8" font-family="monospace" font-size="13">Executed in 42ms · Verified against Warehouse Replica</text>
+
+  <text x="338" y="492" fill="#E2E8F0" font-family="sans-serif" font-size="16" font-weight="600">2. Recommended Next Action</text>
+  <text x="338" y="520" fill="#94A3B8" font-family="sans-serif" font-size="14">Promote the 16:10 Product Hunt preset directly in the onboarding checklist.</text>
+  <rect x="338" y="544" width="184" height="30" rx="6" fill="#182235" stroke="#2B3E63"/>
+  <text x="356" y="564" fill="#93C5FD" font-family="sans-serif" font-size="12" font-weight="600">Apply Recommendation</text>
+
+  <rect x="310" y="618" width="830" height="72" rx="14" fill="#121520" stroke="#283046"/>
+  <text x="338" y="660" fill="#64748B" font-family="sans-serif" font-size="15">Ask a follow-up question or attach a CSV / SQL table...</text>
+  <rect x="1032" y="634" width="90" height="40" rx="9" fill="#2563EB"/>
+  <text x="1062" y="659" fill="#FFFFFF" font-family="sans-serif" font-size="13" font-weight="600">Send</text>
+</svg>`),
+  },
+  social: {
+    label: "Creator Card",
+    recommendedFrame: "none",
+    src: svgToDataUri(`
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="600" viewBox="0 0 960 600" fill="none">
+  <rect width="960" height="600" fill="#111216"/>
+  <circle cx="108" cy="108" r="36" fill="#2563EB"/>
+  <text x="95" y="116" fill="#FFFFFF" font-family="sans-serif" font-size="22" font-weight="700">AK</text>
+  <text x="164" y="102" fill="#F8FAFC" font-family="sans-serif" font-size="22" font-weight="700">Aarav Kulkarni</text>
+  <text x="164" y="130" fill="#94A3B8" font-family="sans-serif" font-size="15">@aaravbuilds · Founder, ShipFast Labs</text>
+
+  <text x="72" y="216" fill="#F8FAFC" font-family="sans-serif" font-size="30" font-weight="600">Small, focused tools beat bloated platforms.</text>
+  <text x="72" y="264" fill="#CBD5E1" font-family="sans-serif" font-size="24">We replaced 4 separate design subscriptions with</text>
+  <text x="72" y="302" fill="#CBD5E1" font-family="sans-serif" font-size="24">one clean browser mockup studio — zero logins,</text>
+  <text x="72" y="340" fill="#CBD5E1" font-family="sans-serif" font-size="24">instant 3x PNG exports, and 150+ templates.</text>
+
+  <rect x="72" y="392" width="816" height="106" rx="14" fill="#171920" stroke="#262936"/>
+  <text x="104" y="434" fill="#94A3B8" font-family="sans-serif" font-size="13" font-weight="600">VERIFIED IMPACT · 30-DAY LAUNCH LOG</text>
+  <text x="104" y="472" fill="#34D399" font-family="sans-serif" font-size="22" font-weight="700">14,820 exports</text>
+  <text x="360" y="472" fill="#F8FAFC" font-family="sans-serif" font-size="22" font-weight="700">38s avg workflow</text>
+  <text x="660" y="472" fill="#60A5FA" font-family="sans-serif" font-size="22" font-weight="700">$0 server cost</text>
+
+  <text x="72" y="548" fill="#64748B" font-family="sans-serif" font-size="14">9:14 AM · Nov 14, 2026 · 1,420 Reposts · 6,890 Likes</text>
+</svg>`),
+  },
 };
 
 export type TemplateCategory =
@@ -376,7 +523,9 @@ export type TemplateCategory =
   | "Mobile"
   | "Engineering"
   | "Editorial"
-  | "Marketing";
+  | "Marketing"
+  | "AI & Agents"
+  | "E-Commerce";
 
 export interface SceneTemplate {
   id: string;
@@ -389,6 +538,8 @@ export interface SceneTemplate {
 export const INITIAL_STUDIO_STATE: StudioState = {
   imageSrc: SAMPLE_MOCKUPS.saas.src,
   imageName: "saas-analytics.svg",
+  activeSampleId: "saas",
+  mockupData: DEFAULT_MOCKUP_DATA,
   frame: "macos-dark",
   browserUrl: "app.snapframe.io/analytics",
   windowTitle: "Revenue Overview — Q4",
@@ -397,6 +548,7 @@ export const INITIAL_STUDIO_STATE: StudioState = {
   customSolidColor: "#1e293b",
   useCustomSolid: false,
   customBgImage: null,
+  pattern: "spotlight",
   grainOpacity: 8,
   padding: 56,
   borderRadius: 14,
@@ -405,7 +557,9 @@ export const INITIAL_STUDIO_STATE: StudioState = {
   tiltPreset: "flat",
   rotateX: 0,
   rotateY: 0,
+  rotateZ: 0,
   showCaption: true,
+  captionEyebrow: "New Release",
   captionTitle: "Real-time revenue metrics, zero setup.",
   captionSubtitle: "Track MRR, expansion, and cohort retention in one clean workspace.",
   captionPosition: "top",
@@ -413,3 +567,4 @@ export const INITIAL_STUDIO_STATE: StudioState = {
   exportFormat: "png",
   exportScale: 2,
 };
+

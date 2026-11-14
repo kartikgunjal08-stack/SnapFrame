@@ -11,6 +11,8 @@ interface TemplatesViewProps {
 const CATEGORIES: ("All" | TemplateCategory)[] = [
   "All",
   "Launch",
+  "AI & Agents",
+  "E-Commerce",
   "Social",
   "Mobile",
   "Engineering",
@@ -24,6 +26,8 @@ const FRAME_FILTERS: { id: "all" | FrameType; label: string }[] = [
   { id: "macos-light", label: "macOS Light" },
   { id: "browser", label: "Browser" },
   { id: "iphone", label: "iPhone" },
+  { id: "tablet", label: "Tablet" },
+  { id: "glass", label: "Glass" },
   { id: "none", label: "Frameless" },
 ];
 
@@ -72,9 +76,9 @@ export const TemplatesView: React.FC<TemplatesViewProps> = ({ onApplyTemplate })
             <div className="flex items-center gap-2 text-xs text-zinc-500 mb-2">
               <span className="font-mono-tabular text-zinc-300">{SCENE_TEMPLATES.length} Templates</span>
               <span aria-hidden="true">·</span>
-              <span>6 Categories</span>
+              <span>8 Categories</span>
               <span aria-hidden="true">·</span>
-              <span>24 Curated Backdrops</span>
+              <span>{BACKGROUND_PRESETS.length} Curated Backdrops</span>
             </div>
             <h1
               className="font-display font-bold tracking-tight text-white text-balance"
@@ -209,6 +213,40 @@ export const TemplatesView: React.FC<TemplatesViewProps> = ({ onApplyTemplate })
                   BACKGROUND_PRESETS.find((b) => b.id === tpl.patch.backgroundId) ||
                   BACKGROUND_PRESETS[0];
                 const isPhone = tpl.patch.frame === "iphone";
+                const isTablet = tpl.patch.frame === "tablet";
+                const isGlass = tpl.patch.frame === "glass";
+                const pat = tpl.patch.pattern;
+
+                const miniPatternStyle: React.CSSProperties | undefined =
+                  pat === "dots"
+                    ? {
+                        backgroundImage: `radial-gradient(${
+                          bg.isDark ? "rgba(255,255,255,0.16)" : "rgba(15,23,42,0.16)"
+                        } 1px, transparent 1px)`,
+                        backgroundSize: "12px 12px",
+                      }
+                    : pat === "grid"
+                      ? {
+                          backgroundImage: `linear-gradient(to right, ${
+                            bg.isDark ? "rgba(255,255,255,0.08)" : "rgba(15,23,42,0.08)"
+                          } 1px, transparent 1px), linear-gradient(to bottom, ${
+                            bg.isDark ? "rgba(255,255,255,0.08)" : "rgba(15,23,42,0.08)"
+                          } 1px, transparent 1px)`,
+                          backgroundSize: "20px 20px",
+                        }
+                      : pat === "spotlight"
+                        ? {
+                            backgroundImage: `radial-gradient(circle at 50% 45%, ${
+                              bg.isDark ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.55)"
+                            } 0%, transparent 65%)`,
+                          }
+                        : pat === "rings"
+                          ? {
+                              backgroundImage: `repeating-radial-gradient(circle at 50% 50%, transparent 0px, transparent 22px, ${
+                                bg.isDark ? "rgba(255,255,255,0.09)" : "rgba(15,23,42,0.09)"
+                              } 23px, transparent 24px)`,
+                            }
+                          : undefined;
 
                 return (
                   <div
@@ -220,10 +258,25 @@ export const TemplatesView: React.FC<TemplatesViewProps> = ({ onApplyTemplate })
                       className="h-44 p-5 flex items-center justify-center overflow-hidden relative"
                       style={{ backgroundImage: bg.style }}
                     >
+                      {miniPatternStyle && (
+                        <div
+                          aria-hidden="true"
+                          className="pointer-events-none absolute inset-0"
+                          style={miniPatternStyle}
+                        />
+                      )}
                       <div
-                        className={`${isPhone ? "w-20 rounded-2xl p-1 bg-[#121215]" : "w-[78%] rounded-lg"} overflow-hidden border border-white/15 shadow-2xl transition-transform duration-200 group-hover:scale-[1.03]`}
+                        className={`relative z-10 overflow-hidden shadow-2xl transition-transform duration-200 group-hover:scale-[1.03] ${
+                          isPhone
+                            ? "w-20 rounded-2xl p-1 bg-[#121215] border border-white/15"
+                            : isTablet
+                              ? "w-[80%] rounded-xl p-1.5 bg-[#101115] border border-white/15"
+                              : isGlass
+                                ? "w-[78%] rounded-xl p-1.5 bg-white/10 backdrop-blur-sm border border-white/25"
+                                : "w-[78%] rounded-lg border border-white/15"
+                        }`}
                         style={{
-                          transform: `perspective(900px) rotateX(${tpl.patch.rotateX ?? 0}deg) rotateY(${tpl.patch.rotateY ?? 0}deg)`,
+                          transform: `perspective(900px) rotateX(${tpl.patch.rotateX ?? 0}deg) rotateY(${tpl.patch.rotateY ?? 0}deg) rotateZ(${tpl.patch.rotateZ ?? 0}deg)`,
                         }}
                       >
                         {tpl.patch.imageSrc && (
@@ -231,7 +284,13 @@ export const TemplatesView: React.FC<TemplatesViewProps> = ({ onApplyTemplate })
                             src={tpl.patch.imageSrc}
                             alt={tpl.name}
                             referrerPolicy="no-referrer"
-                            className={`${isPhone ? "h-32 rounded-xl" : "h-28"} w-full object-cover object-top block`}
+                            className={`${
+                              isPhone
+                                ? "h-32 rounded-xl"
+                                : isTablet || isGlass
+                                  ? "h-28 rounded-md"
+                                  : "h-28"
+                            } w-full object-cover object-top block`}
                           />
                         )}
                       </div>
