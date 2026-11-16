@@ -5,10 +5,14 @@ export async function exportElementToImage(
   element: HTMLElement,
   format: ExportFormat,
   scale: ExportScale,
-  fileNameBase: string
+  fileNameBase: string,
+  pixelSpec?: { width: number; height: number },
+  customSuffix?: string
 ): Promise<void> {
   const options = {
-    pixelRatio: scale,
+    pixelRatio: pixelSpec ? 1 : scale,
+    canvasWidth: pixelSpec?.width,
+    canvasHeight: pixelSpec?.height,
     cacheBust: false,
     quality: 0.96,
     skipAutoScale: false,
@@ -21,7 +25,12 @@ export async function exportElementToImage(
 
   const link = document.createElement("a");
   const cleanName = fileNameBase.replace(/\.[^/.]+$/, "").replace(/[^a-zA-Z0-9-_]/g, "-");
-  link.download = `${cleanName || "snapframy-mockup"}-${scale}x.${format}`;
+  const suffix = customSuffix
+    ? customSuffix
+    : pixelSpec
+      ? `${pixelSpec.width}x${pixelSpec.height}`
+      : `${scale}x`;
+  link.download = `${cleanName || "snapframy-mockup"}-${suffix}.${format}`;
   link.href = dataUrl;
   document.body.appendChild(link);
   link.click();

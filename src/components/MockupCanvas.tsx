@@ -1,13 +1,23 @@
-import React, { useState } from "react";
-import { Upload, RotateCcw, ZoomIn, ZoomOut, Lock } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { Upload, RotateCcw, ZoomIn, ZoomOut, Lock, ShieldCheck } from "lucide-react";
 import { APP_CONFIG } from "../config";
 import { ASPECT_RATIO_OPTIONS, BACKGROUND_PRESETS } from "../data/presets";
-import { MockupContentData, ShadowLevel, StudioState } from "../types/studio";
+import {
+  BrandKit,
+  CanvasSelectedElement,
+  MockupContentData,
+  ShadowLevel,
+  StudioState,
+} from "../types/studio";
+import { getFontMoodClasses } from "../utils/brandKitStorage";
 import { InlineEditable } from "./InlineEditable";
 import { LiveSceneRenderer } from "./LiveSceneRenderer";
+import { QuickActionDock, STUDIO_IMAGE_FILTERS } from "./QuickActionDock";
+import { SafeZoneOverlay } from "./SafeZoneOverlay";
 
 interface MockupCanvasProps {
   state: StudioState;
+  brandKit: BrandKit;
   isExporting: boolean;
   exportRef: React.RefObject<HTMLDivElement | null>;
   onUpdate: (patch: Partial<StudioState>) => void;
@@ -30,6 +40,7 @@ const NOISE_SVG_URI = `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmln
 
 export const MockupCanvas: React.FC<MockupCanvasProps> = ({
   state,
+  brandKit,
   isExporting,
   exportRef,
   onUpdate,
@@ -39,11 +50,24 @@ export const MockupCanvas: React.FC<MockupCanvasProps> = ({
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [stageZoom, setStageZoom] = useState<number>(100);
+  const [selectedElement, setSelectedElement] = useState<CanvasSelectedElement | null>(null);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSelectedElement(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  const activeFilterCss =
+    STUDIO_IMAGE_FILTERS.find((f) => f.id === (state.imageFilter || "none"))?.css || "none";
 
   const activeBg =
     BACKGROUND_PRESETS.find((b) => b.id === state.backgroundId) || BACKGROUND_PRESETS[0];
 
   const activeRatio = ASPECT_RATIO_OPTIONS.find((r) => r.id === state.aspectRatio);
+  const fonts = getFontMoodClasses(brandKit.fontMood);
 
   const backgroundStyle: React.CSSProperties = state.customBgImage
     ? {
@@ -124,24 +148,40 @@ export const MockupCanvas: React.FC<MockupCanvasProps> = ({
   const isGlass = state.frame === "glass";
   const innerRadius = Math.max(0, state.borderRadius - 2);
 
+  const stageWidth =
+    state.aspectRatio === "appstore-69" ||
+    state.aspectRatio === "appstore-65" ||
+    state.aspectRatio === "play-store" ||
+    state.aspectRatio === "9:16"
+      ? "380px"
+      : state.aspectRatio === "4:5"
+        ? "560px"
+        : state.aspectRatio === "1:1"
+          ? "640px"
+          : "780px";
+
   const renderScreenContent = (extraClassName = "") => {
-    if (state.activeSampleId) {
-      return (
-        <LiveSceneRenderer
-          sampleId={state.activeSampleId}
-          data={state.mockupData}
-          isExporting={isExporting}
-          onUpdateData={onUpdateMockupData}
-        />
-      );
-    }
-    return (
+    const content = state.activeSampleId ? (
+      <LiveSceneRenderer
+        sampleId={state.activeSampleId}
+        data={state.mockupData}
+        isExporting={isExporting}
+        onUpdateData={onUpdateMockupData}
+      />
+    ) : (
       <img
         src={state.imageSrc}
         alt="Screenshot mockup preview"
         referrerPolicy="no-referrer"
         className={`w-full h-auto block ${extraClassName}`}
       />
+    );
+
+    if (activeFilterCss === "none") return content;
+    return (
+      <div style={{ filter: activeFilterCss }} className="w-full h-full">
+        {content}
+      </div>
     );
   };
 
@@ -236,7 +276,7 @@ export const MockupCanvas: React.FC<MockupCanvasProps> = ({
             placeholder="Click to add headline..."
             onChange={(val) => onUpdate({ captionTitle: val })}
             className={`font-display font-bold tracking-tight leading-tight text-balance inline-block ${textColor}`}
-            style={{ fontSize: "clamp(1.15rem, 2.2vw, 1.65rem)" }}
+            style={{ fontSize: "clamp(1.15rem, 2.2vw, 1.65rem)", ...fonts.displayStyle }}
           />
         </div>
         {(state.captionSubtitle || !isExporting) && (
@@ -248,6 +288,7 @@ export const MockupCanvas: React.FC<MockupCanvasProps> = ({
               placeholder="Click to add subtitle..."
               onChange={(val) => onUpdate({ captionSubtitle: val })}
               className={`text-xs sm:text-sm leading-relaxed inline-block ${subColor}`}
+              style={fonts.bodyStyle}
             />
           </div>
         )}
@@ -267,6 +308,9 @@ export const MockupCanvas: React.FC<MockupCanvasProps> = ({
         <div className="flex items-center gap-2.5 text-xs text-zinc-400 min-w-0">
           <span className="font-mono-tabular text-zinc-300 whitespace-nowrap">
             {activeRatio?.label}
+            {activeRatio?.pixelSpec
+              ? ` (${activeRatio.pixelSpec.width}×${activeRatio.pixelSpec.height})`
+              : ""}
           </span>
           <span aria-hidden="true" className="text-zinc-600">
             ·
@@ -279,9 +323,24 @@ export const MockupCanvas: React.FC<MockupCanvasProps> = ({
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
+          {state.safeZoneId !== "none" && (
+            <button
+              type="button"
+              onClick={() => onUpdate({ showSafeZone: !state.showSafeZone })}
+              className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium mr-1 cursor-pointer ${
+                state.showSafeZone
+                  ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/40"
+                  : "text-zinc-400 hover:text-white"
+              }`}
+              title="Toggle Safe-Zone Compliance Overlay"
+            >
+              <ShieldCheck className="w-3 h-3" />
+              Safe-Zone
+            </button>
+          )}
           <button
             type="button"
-            onClick={() => setStageZoom((z) => Math.max(60, z - 10))}
+            onClick={() => setStageZoom((z) => Math.max(50, z - 10))}
             className="p-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
             title="Zoom out preview"
           >
@@ -314,7 +373,10 @@ export const MockupCanvas: React.FC<MockupCanvasProps> = ({
       </div>
 
       {/* Main Centered Interactive Stage */}
-      <div className="flex-1 flex items-center justify-center p-4 sm:p-8 overflow-auto studio-scroll">
+      <div
+        onClick={() => setSelectedElement(null)}
+        className="flex-1 flex items-center justify-center p-4 sm:p-8 overflow-auto studio-scroll"
+      >
         <div
           className="transition-transform duration-150 ease-out origin-center max-w-full"
           style={{ transform: `scale(${stageZoom / 100})` }}
@@ -322,17 +384,20 @@ export const MockupCanvas: React.FC<MockupCanvasProps> = ({
           {/* Export Target Container */}
           <div
             ref={exportRef}
-            className="relative flex flex-col items-center justify-center overflow-hidden select-none"
+            onClick={(e) => {
+              e.stopPropagation();
+              setSelectedElement("backdrop");
+            }}
+            className={`relative flex flex-col items-center justify-center overflow-hidden select-none transition-shadow ${
+              !isExporting && selectedElement === "backdrop"
+                ? "ring-2 ring-[#3B82F6]/60"
+                : ""
+            }`}
             style={{
               ...backgroundStyle,
               aspectRatio: activeRatio?.ratioValue || undefined,
               padding: `${state.padding}px`,
-              width:
-                state.aspectRatio === "4:5"
-                  ? "560px"
-                  : state.aspectRatio === "1:1"
-                    ? "640px"
-                    : "780px",
+              width: stageWidth,
               maxWidth: "100%",
               borderRadius: "4px",
             }}
@@ -358,14 +423,40 @@ export const MockupCanvas: React.FC<MockupCanvasProps> = ({
               />
             )}
 
+            {/* Store Compliance Safe-Zone Guide Overlay (Never exported) */}
+            <SafeZoneOverlay
+              safeZoneId={state.safeZoneId}
+              visible={state.showSafeZone && !isExporting}
+            />
+
             {/* Top Caption */}
             {state.showCaption && state.captionPosition === "top" && (
-              <div className="relative z-10 mb-6 w-full">{renderCaption()}</div>
+              <div
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedElement("caption");
+                }}
+                className={`relative z-10 mb-6 w-full rounded-lg py-1 transition-shadow cursor-pointer ${
+                  !isExporting && selectedElement === "caption"
+                    ? "ring-2 ring-[#3B82F6]/65"
+                    : ""
+                }`}
+              >
+                {renderCaption()}
+              </div>
             )}
 
             {/* 3D Perspective Mockup Wrapper */}
             <div
-              className="relative z-10 flex items-center justify-center transition-transform duration-200 ease-out"
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelectedElement("device");
+              }}
+              className={`relative z-10 flex items-center justify-center transition-transform duration-200 ease-out cursor-pointer rounded-xl ${
+                !isExporting && selectedElement === "device"
+                  ? "ring-2 ring-[#3B82F6]/70 ring-offset-4 ring-offset-transparent"
+                  : ""
+              }`}
               style={{
                 width: isPhone ? "258px" : `${state.scale}%`,
                 transform: `perspective(1400px) rotateX(${state.rotateX}deg) rotateY(${state.rotateY}deg) rotateZ(${state.rotateZ}deg)`,
@@ -445,11 +536,63 @@ export const MockupCanvas: React.FC<MockupCanvasProps> = ({
 
             {/* Bottom Caption */}
             {state.showCaption && state.captionPosition === "bottom" && (
-              <div className="relative z-10 mt-6 w-full">{renderCaption()}</div>
+              <div
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedElement("caption");
+                }}
+                className={`relative z-10 mt-6 w-full rounded-lg py-1 transition-shadow cursor-pointer ${
+                  !isExporting && selectedElement === "caption"
+                    ? "ring-2 ring-[#3B82F6]/65"
+                    : ""
+                }`}
+              >
+                {renderCaption()}
+              </div>
+            )}
+
+            {/* Brand Kit Logo & Domain Badge */}
+            {(brandKit.showDomainBadge || brandKit.logoDataUrl) && (
+              <div
+                className={`absolute bottom-3 right-4 z-20 flex items-center gap-2 text-[11px] font-mono-tabular font-semibold ${
+                  isDarkBackdrop ? "text-white/80" : "text-zinc-800/80"
+                }`}
+              >
+                {brandKit.logoDataUrl && (
+                  <img
+                    src={brandKit.logoDataUrl}
+                    alt={brandKit.brandName}
+                    className="w-4 h-4 rounded object-contain"
+                  />
+                )}
+                {brandKit.showDomainBadge && <span>{brandKit.domainBadge}</span>}
+              </div>
             )}
           </div>
         </div>
       </div>
+
+      {/* Context-Sensitive Quick-Action Dock (Hidden during export) */}
+      {!isExporting && (
+        <QuickActionDock
+          selectedElement={selectedElement}
+          state={state}
+          onUpdate={onUpdate}
+          onUploadFile={onUploadFile}
+          onResetPosition={() => {
+            setStageZoom(100);
+            onUpdate({
+              tiltPreset: "flat",
+              rotateX: 0,
+              rotateY: 0,
+              rotateZ: 0,
+              scale: 92,
+              padding: 48,
+            });
+          }}
+          onClose={() => setSelectedElement(null)}
+        />
+      )}
 
       {/* Drag-and-Drop Overlay */}
       {isDragging && (
