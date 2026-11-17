@@ -8,6 +8,9 @@ import {
   Layers,
   ChevronLeft,
   ChevronRight,
+  Smartphone,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { toPng } from "html-to-image";
 import { BACKGROUND_PRESETS, SAMPLE_MOCKUPS } from "../data/presets";
@@ -40,53 +43,226 @@ const CAROUSEL_FORMATS: Record<
   { label: string; platform: string; width: number; height: number }
 > = {
   "linkedin-4x5": { label: "4:5", platform: "LinkedIn Carousel", width: 432, height: 540 },
+  "mobile-9x16": { label: "9:16", platform: "Phone / Stories", width: 312, height: 554 },
   "product-hunt": { label: "1270×760", platform: "Product Hunt", width: 520, height: 311 },
   "x-16x9": { label: "16:9", platform: "X / Twitter", width: 520, height: 293 },
   "square-1x1": { label: "1:1", platform: "Square Deck", width: 440, height: 440 },
 };
 
+interface CarouselDeckTemplate {
+  id: string;
+  name: string;
+  tag: string;
+  format: CarouselFormat;
+  backgroundId: string;
+  pattern: BackdropPattern;
+  isPhone?: boolean;
+  buildSlides: (brandName: string) => CarouselSlide[];
+}
+
+const CAROUSEL_TEMPLATES: CarouselDeckTemplate[] = [
+  {
+    id: "saas-launch-4x5",
+    name: "SaaS Launch Deck",
+    tag: "4:5 · LinkedIn",
+    format: "linkedin-4x5",
+    backgroundId: "cobalt-eclipse",
+    pattern: "spotlight",
+    buildSlides: (brandName) => [
+      {
+        id: "slide-1",
+        eyebrow: "01 · The Problem",
+        headline: "Stop posting flat screenshots.",
+        subtitle: `${brandName} turns raw product captures into launch-ready visuals in seconds.`,
+        frame: "macos-dark",
+        imageSrc: SAMPLE_MOCKUPS.saas.src,
+        activeSampleId: "saas",
+        scale: 92,
+        rotateX: 4,
+        rotateY: 10,
+        rotateZ: 0,
+      },
+      {
+        id: "slide-2",
+        eyebrow: "02 · Click-to-Edit",
+        headline: "Edit every metric & chart live.",
+        subtitle: "Click directly on KPIs, charts, or UI labels — no Figma or upload needed.",
+        frame: "browser",
+        imageSrc: SAMPLE_MOCKUPS.ai.src,
+        activeSampleId: "ai",
+        scale: 94,
+        rotateX: 0,
+        rotateY: 0,
+        rotateZ: 0,
+      },
+      {
+        id: "slide-3",
+        eyebrow: "03 · Launch Ready",
+        headline: "Export 3x assets in one click.",
+        subtitle: "Zero watermarks, zero server costs, and consistent Brand DNA across every slide.",
+        frame: "glass",
+        imageSrc: SAMPLE_MOCKUPS.ecommerce.src,
+        activeSampleId: "ecommerce",
+        scale: 92,
+        rotateX: 4,
+        rotateY: -10,
+        rotateZ: 0,
+      },
+    ],
+  },
+  {
+    id: "mobile-app-tour-9x16",
+    name: "Mobile App Tour (Phone)",
+    tag: "9:16 · iPhone",
+    format: "mobile-9x16",
+    backgroundId: "cobalt-eclipse",
+    pattern: "dots",
+    isPhone: true,
+    buildSlides: (brandName) => [
+      {
+        id: "m-slide-1",
+        eyebrow: "01 · Mobile First",
+        headline: `${brandName} in your pocket.`,
+        subtitle: "Built for iOS & Android speed with instant sync everywhere.",
+        frame: "iphone",
+        imageSrc: SAMPLE_MOCKUPS.mobile.src,
+        activeSampleId: "mobile",
+        scale: 95,
+        rotateX: 0,
+        rotateY: 6,
+        rotateZ: 0,
+      },
+      {
+        id: "m-slide-2",
+        eyebrow: "02 · Live Insights",
+        headline: "Track growth on the go.",
+        subtitle: "Real-time alerts, conversion funnels, and smart summaries.",
+        frame: "iphone",
+        imageSrc: SAMPLE_MOCKUPS.saas.src,
+        activeSampleId: "saas",
+        scale: 95,
+        rotateX: 0,
+        rotateY: 0,
+        rotateZ: 0,
+      },
+      {
+        id: "m-slide-3",
+        eyebrow: "03 · AI Copilot",
+        headline: "Ship answers in one tap.",
+        subtitle: "Swipe up or tap the link in bio to try free today.",
+        frame: "iphone",
+        imageSrc: SAMPLE_MOCKUPS.ai.src,
+        activeSampleId: "ai",
+        scale: 95,
+        rotateX: 0,
+        rotateY: -6,
+        rotateZ: 0,
+      },
+    ],
+  },
+  {
+    id: "mobile-stories-hook-9x16",
+    name: "Stories & Reels Phone Deck",
+    tag: "9:16 · iPhone",
+    format: "mobile-9x16",
+    backgroundId: "sunset-ember",
+    pattern: "spotlight",
+    isPhone: true,
+    buildSlides: (brandName) => [
+      {
+        id: "st-slide-1",
+        eyebrow: "01 · Quick Hook",
+        headline: "3 features you missed.",
+        subtitle: `Swipe through how ${brandName} saves 6+ hours every week.`,
+        frame: "iphone",
+        imageSrc: SAMPLE_MOCKUPS.social.src,
+        activeSampleId: "social",
+        scale: 96,
+        rotateX: 0,
+        rotateY: 0,
+        rotateZ: 0,
+      },
+      {
+        id: "st-slide-2",
+        eyebrow: "02 · Storefront",
+        headline: "Checkout in 2 seconds.",
+        subtitle: "Apple Pay & one-tap mobile flows tuned for conversion.",
+        frame: "iphone",
+        imageSrc: SAMPLE_MOCKUPS.ecommerce.src,
+        activeSampleId: "ecommerce",
+        scale: 96,
+        rotateX: 0,
+        rotateY: 4,
+        rotateZ: 0,
+      },
+      {
+        id: "st-slide-3",
+        eyebrow: "03 · Try Free",
+        headline: "Start free in 30 seconds.",
+        subtitle: "No setup fees. Export branded assets immediately.",
+        frame: "iphone",
+        imageSrc: SAMPLE_MOCKUPS.mobile.src,
+        activeSampleId: "mobile",
+        scale: 96,
+        rotateX: 0,
+        rotateY: -4,
+        rotateZ: 0,
+      },
+    ],
+  },
+  {
+    id: "product-hunt-gallery",
+    name: "Product Hunt Gallery",
+    tag: "1270×760 · Launch",
+    format: "product-hunt",
+    backgroundId: "midnight-aurora",
+    pattern: "grid",
+    buildSlides: (brandName) => [
+      {
+        id: "ph-1",
+        eyebrow: "Introducing",
+        headline: `${brandName} 2.0 Launch`,
+        subtitle: "Create product launches, reels, and decks from a single screenshot.",
+        frame: "macos-dark",
+        imageSrc: SAMPLE_MOCKUPS.saas.src,
+        activeSampleId: "saas",
+        scale: 90,
+        rotateX: 0,
+        rotateY: 0,
+        rotateZ: 0,
+      },
+      {
+        id: "ph-2",
+        eyebrow: "Workflow",
+        headline: "Instant AI Storytelling",
+        subtitle: "Zero editing bottlenecks for founders and growth teams.",
+        frame: "glass",
+        imageSrc: SAMPLE_MOCKUPS.ai.src,
+        activeSampleId: "ai",
+        scale: 90,
+        rotateX: 0,
+        rotateY: 0,
+        rotateZ: 0,
+      },
+      {
+        id: "ph-3",
+        eyebrow: "Developer Ready",
+        headline: "Clean Code & Fast Ship",
+        subtitle: "Export crisp 2x/3x visuals ready for any launch page.",
+        frame: "browser",
+        imageSrc: SAMPLE_MOCKUPS.code.src,
+        activeSampleId: "code",
+        scale: 90,
+        rotateX: 0,
+        rotateY: 0,
+        rotateZ: 0,
+      },
+    ],
+  },
+];
+
 function createInitialSlides(brandName: string): CarouselSlide[] {
-  return [
-    {
-      id: "slide-1",
-      eyebrow: "01 · The Problem",
-      headline: "Stop posting flat screenshots.",
-      subtitle: `${brandName} turns raw product captures into launch-ready visuals in seconds.`,
-      frame: "macos-dark",
-      imageSrc: SAMPLE_MOCKUPS.saas.src,
-      activeSampleId: "saas",
-      scale: 92,
-      rotateX: 4,
-      rotateY: 10,
-      rotateZ: 0,
-    },
-    {
-      id: "slide-2",
-      eyebrow: "02 · Click-to-Edit",
-      headline: "Edit every metric & chart live.",
-      subtitle: "Click directly on KPIs, charts, or UI labels — no Figma or upload needed.",
-      frame: "browser",
-      imageSrc: SAMPLE_MOCKUPS.ai.src,
-      activeSampleId: "ai",
-      scale: 94,
-      rotateX: 0,
-      rotateY: 0,
-      rotateZ: 0,
-    },
-    {
-      id: "slide-3",
-      eyebrow: "03 · Launch Ready",
-      headline: "Export 3x assets in one click.",
-      subtitle: "Zero watermarks, zero server costs, and consistent Brand DNA across every slide.",
-      frame: "glass",
-      imageSrc: SAMPLE_MOCKUPS.ecommerce.src,
-      activeSampleId: "ecommerce",
-      scale: 92,
-      rotateX: 4,
-      rotateY: -10,
-      rotateZ: 0,
-    },
-  ];
+  return CAROUSEL_TEMPLATES[0].buildSlides(brandName);
 }
 
 export const CarouselBuilderView: React.FC<CarouselBuilderViewProps> = ({
@@ -96,10 +272,13 @@ export const CarouselBuilderView: React.FC<CarouselBuilderViewProps> = ({
   onOpenBrandKit,
   onNotify,
 }) => {
+  const [activeTemplateId, setActiveTemplateId] = useState(CAROUSEL_TEMPLATES[0].id);
   const [format, setFormat] = useState<CarouselFormat>("linkedin-4x5");
   const [backgroundId, setBackgroundId] = useState("cobalt-eclipse");
   const [pattern, setPattern] = useState<BackdropPattern>("spotlight");
   const [useBrandTint, setUseBrandTint] = useState(true);
+  const [showBrandHeader, setShowBrandHeader] = useState(true);
+  const [showSlideText, setShowSlideText] = useState(true);
   const [slides, setSlides] = useState<CarouselSlide[]>(() =>
     createInitialSlides(brandKit.brandName)
   );
@@ -113,6 +292,41 @@ export const CarouselBuilderView: React.FC<CarouselBuilderViewProps> = ({
   const bgPreset = BACKGROUND_PRESETS.find((b) => b.id === backgroundId) || BACKGROUND_PRESETS[0];
   const activeSlide = slides[Math.min(activeIndex, slides.length - 1)];
   const fonts = getFontMoodClasses(brandKit.fontMood);
+  const isPhoneDeck = format === "mobile-9x16" && slides.every((s) => s.frame === "iphone");
+
+  const applyCarouselTemplate = (tpl: CarouselDeckTemplate) => {
+    setActiveTemplateId(tpl.id);
+    setFormat(tpl.format);
+    setBackgroundId(tpl.backgroundId);
+    setPattern(tpl.pattern);
+    setSlides(tpl.buildSlides(brandKit.brandName || "SnapFramy"));
+    setActiveIndex(0);
+    onNotify(`Applied "${tpl.name}" carousel template`);
+  };
+
+  const togglePhoneDeckFormat = () => {
+    if (isPhoneDeck) {
+      setFormat("linkedin-4x5");
+      setSlides((prev) =>
+        prev.map((s) => ({
+          ...s,
+          frame: "macos-dark",
+          scale: 92,
+        }))
+      );
+      onNotify("Switched Carousel back to 4:5 Desktop format");
+    } else {
+      setFormat("mobile-9x16");
+      setSlides((prev) =>
+        prev.map((s) => ({
+          ...s,
+          frame: "iphone",
+          scale: Math.max(85, Math.min(105, s.scale)),
+        }))
+      );
+      onNotify("Converted Carousel to Phone Format (9:16 · iPhone)");
+    }
+  };
 
   const updateSlide = (index: number, patch: Partial<CarouselSlide>) => {
     setSlides((prev) => prev.map((s, idx) => (idx === index ? { ...s, ...patch } : s)));
@@ -235,8 +449,44 @@ export const CarouselBuilderView: React.FC<CarouselBuilderViewProps> = ({
 
   return (
     <div className="flex-1 flex flex-col lg:flex-row min-h-0 bg-[#0A0A0C]">
-      {/* Left Controls: Format, Slides, Backdrop */}
+      {/* Left Controls: Templates, Format, Slides, Backdrop */}
       <aside className="w-full lg:w-[270px] shrink-0 border-b lg:border-b-0 lg:border-r border-[#1E1E24] bg-[#101014] p-4 space-y-5 overflow-y-auto studio-scroll">
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-xs font-semibold text-white">Deck Templates</h2>
+            <span className="text-[10px] font-mono-tabular text-zinc-400">
+              {CAROUSEL_TEMPLATES.length} decks
+            </span>
+          </div>
+          <div className="space-y-1.5">
+            {CAROUSEL_TEMPLATES.map((tpl) => {
+              const active = activeTemplateId === tpl.id;
+              return (
+                <button
+                  key={tpl.id}
+                  type="button"
+                  onClick={() => applyCarouselTemplate(tpl)}
+                  className={`w-full text-left px-2.5 py-2 rounded-md border cursor-pointer transition-colors ${
+                    active
+                      ? "bg-[#2563EB]/15 border-[#3B82F6]/60 text-white"
+                      : "bg-[#141419] border-[#22222A] text-zinc-300 hover:border-[#32323E]"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[11px] font-semibold truncate">{tpl.name}</span>
+                    {tpl.isPhone && (
+                      <Smartphone className="w-3 h-3 text-[#60A5FA] shrink-0" />
+                    )}
+                  </div>
+                  <div className="text-[10px] text-zinc-500 mt-0.5">{tpl.tag}</div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="h-px bg-[#1E1E24]" />
+
         <div>
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-xs font-semibold text-white">Carousel Format</h2>
@@ -381,7 +631,54 @@ export const CarouselBuilderView: React.FC<CarouselBuilderViewProps> = ({
             </span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={() => setShowBrandHeader((v) => !v)}
+              title="Show or hide Brand Name / URL in slide bar & footer"
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs font-medium cursor-pointer whitespace-nowrap transition-colors ${
+                showBrandHeader
+                  ? "bg-[#2563EB]/20 border-[#3B82F6] text-white"
+                  : "bg-[#18181F] hover:bg-[#22222C] border-[#282834] text-zinc-400"
+              }`}
+            >
+              {showBrandHeader ? (
+                <Eye className="w-3.5 h-3.5 text-[#60A5FA]" />
+              ) : (
+                <EyeOff className="w-3.5 h-3.5" />
+              )}
+              Brand / URL
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowSlideText((v) => !v)}
+              title="Show or hide Slide Eyebrow & Headline text"
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs font-medium cursor-pointer whitespace-nowrap transition-colors ${
+                showSlideText
+                  ? "bg-[#2563EB]/20 border-[#3B82F6] text-white"
+                  : "bg-[#18181F] hover:bg-[#22222C] border-[#282834] text-zinc-400"
+              }`}
+            >
+              {showSlideText ? (
+                <Eye className="w-3.5 h-3.5 text-[#60A5FA]" />
+              ) : (
+                <EyeOff className="w-3.5 h-3.5" />
+              )}
+              Headings
+            </button>
+            <button
+              type="button"
+              onClick={togglePhoneDeckFormat}
+              title="Convert all slides to Mobile Phone Format (9:16 · iPhone)"
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs font-medium cursor-pointer whitespace-nowrap transition-colors ${
+                isPhoneDeck
+                  ? "bg-[#2563EB]/20 border-[#3B82F6] text-white"
+                  : "bg-[#18181F] hover:bg-[#22222C] border-[#282834] text-zinc-200"
+              }`}
+            >
+              <Smartphone className="w-3.5 h-3.5 text-[#60A5FA]" />
+              Phone Format
+            </button>
             <button
               type="button"
               onClick={onOpenBrandKit}
@@ -449,40 +746,42 @@ export const CarouselBuilderView: React.FC<CarouselBuilderViewProps> = ({
                     )}
 
                     {/* Slide Header Copy */}
-                    <div className="relative z-10 space-y-1 text-left">
-                      <InlineEditable
-                        lightSurface={!lightText}
-                        value={slide.eyebrow}
-                        onChange={(v) => updateSlide(idx, { eyebrow: v })}
-                        className={`text-[10px] font-mono-tabular font-semibold uppercase tracking-widest ${
-                          lightText ? "text-white/75" : "text-zinc-600"
-                        }`}
-                      />
-                      <div>
+                    {showSlideText && (
+                      <div className="relative z-10 space-y-1 text-left">
                         <InlineEditable
-                          as="h2"
                           lightSurface={!lightText}
-                          value={slide.headline}
-                          onChange={(v) => updateSlide(idx, { headline: v })}
-                          className={`text-lg font-bold leading-snug ${
-                            lightText ? "text-white" : "text-zinc-900"
-                          }`}
-                          style={fonts.displayStyle}
-                        />
-                      </div>
-                      <div>
-                        <InlineEditable
-                          as="p"
-                          lightSurface={!lightText}
-                          value={slide.subtitle}
-                          onChange={(v) => updateSlide(idx, { subtitle: v })}
-                          className={`text-[11px] leading-relaxed ${
+                          value={slide.eyebrow}
+                          onChange={(v) => updateSlide(idx, { eyebrow: v })}
+                          className={`text-[10px] font-mono-tabular font-semibold uppercase tracking-widest ${
                             lightText ? "text-white/75" : "text-zinc-600"
                           }`}
-                          style={fonts.bodyStyle}
                         />
+                        <div>
+                          <InlineEditable
+                            as="h2"
+                            lightSurface={!lightText}
+                            value={slide.headline}
+                            onChange={(v) => updateSlide(idx, { headline: v })}
+                            className={`text-lg font-bold leading-snug ${
+                              lightText ? "text-white" : "text-zinc-900"
+                            }`}
+                            style={fonts.displayStyle}
+                          />
+                        </div>
+                        <div>
+                          <InlineEditable
+                            as="p"
+                            lightSurface={!lightText}
+                            value={slide.subtitle}
+                            onChange={(v) => updateSlide(idx, { subtitle: v })}
+                            className={`text-[11px] leading-relaxed ${
+                              lightText ? "text-white/75" : "text-zinc-600"
+                            }`}
+                            style={fonts.bodyStyle}
+                          />
+                        </div>
                       </div>
-                    </div>
+                    )}
 
                     {/* Framed Product Visual */}
                     <div
@@ -491,41 +790,70 @@ export const CarouselBuilderView: React.FC<CarouselBuilderViewProps> = ({
                         transform: `perspective(1000px) scale(${slide.scale / 100}) rotateX(${slide.rotateX}deg) rotateY(${slide.rotateY}deg) rotateZ(${slide.rotateZ}deg)`,
                       }}
                     >
-                      <div className="w-full rounded-xl overflow-hidden border border-white/15 bg-[#0B0D12] shadow-2xl">
-                        {slide.frame !== "none" && slide.frame !== "glass" && (
-                          <div className="px-3 py-1.5 bg-[#191B22] border-b border-white/10 flex items-center gap-1.5">
-                            <span className="w-2 h-2 rounded-full bg-[#FF5F56]" />
-                            <span className="w-2 h-2 rounded-full bg-[#FFBD2E]" />
-                            <span className="w-2 h-2 rounded-full bg-[#27C93F]" />
-                            <span className="ml-2 text-[9px] font-mono-tabular text-zinc-400 truncate">
-                              {brandKit.domainBadge}
-                            </span>
+                      {slide.frame === "iphone" ? (
+                        <div className="w-[178px] rounded-[28px] p-[7px] bg-gradient-to-b from-[#3A3D47] via-[#1B1D24] to-[#2B2E38] shadow-2xl border border-white/15">
+                          <div className="relative rounded-[22px] overflow-hidden bg-[#0B0D12] aspect-[9/16] flex flex-col">
+                            <div className="absolute top-2 left-1/2 -translate-x-1/2 z-20 w-14 h-3.5 rounded-full bg-black border border-white/10" />
+                            <div className="flex-1 overflow-hidden">
+                              {slide.activeSampleId ? (
+                                <LiveSceneRenderer
+                                  sampleId={slide.activeSampleId}
+                                  data={mockupData}
+                                  isExporting={isExportingAll}
+                                  onUpdateData={onUpdateMockupData}
+                                />
+                              ) : (
+                                <img
+                                  src={slide.imageSrc}
+                                  alt={`Slide ${idx + 1}`}
+                                  referrerPolicy="no-referrer"
+                                  className="w-full h-full object-cover block"
+                                />
+                              )}
+                            </div>
                           </div>
-                        )}
-                        <div className="max-h-[260px] overflow-hidden">
-                          {slide.activeSampleId ? (
-                            <LiveSceneRenderer
-                              sampleId={slide.activeSampleId}
-                              data={mockupData}
-                              isExporting={isExportingAll}
-                              onUpdateData={onUpdateMockupData}
-                            />
-                          ) : (
-                            <img
-                              src={slide.imageSrc}
-                              alt={`Slide ${idx + 1}`}
-                              referrerPolicy="no-referrer"
-                              className="w-full h-auto block"
-                            />
-                          )}
                         </div>
-                      </div>
+                      ) : (
+                        <div className="w-full rounded-xl overflow-hidden border border-white/15 bg-[#0B0D12] shadow-2xl">
+                          {showBrandHeader && slide.frame !== "none" && slide.frame !== "glass" && (
+                            <div className="px-3 py-1.5 bg-[#191B22] border-b border-white/10 flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full bg-[#FF5F56]" />
+                              <span className="w-2 h-2 rounded-full bg-[#FFBD2E]" />
+                              <span className="w-2 h-2 rounded-full bg-[#27C93F]" />
+                              <span className="ml-2 text-[9px] font-mono-tabular text-zinc-400 truncate">
+                                {brandKit.domainBadge}
+                              </span>
+                            </div>
+                          )}
+                          <div className="max-h-[260px] overflow-hidden">
+                            {slide.activeSampleId ? (
+                              <LiveSceneRenderer
+                                sampleId={slide.activeSampleId}
+                                data={mockupData}
+                                isExporting={isExportingAll}
+                                onUpdateData={onUpdateMockupData}
+                              />
+                            ) : (
+                              <img
+                                src={slide.imageSrc}
+                                alt={`Slide ${idx + 1}`}
+                                referrerPolicy="no-referrer"
+                                className="w-full h-auto block"
+                              />
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Footer Swipe / Brand Indicator */}
                     <div className="relative z-10 flex items-center justify-between text-[10px] font-mono-tabular">
                       <span className={lightText ? "text-white/65" : "text-zinc-600"}>
-                        {brandKit.showDomainBadge ? brandKit.domainBadge : brandKit.brandName}
+                        {showBrandHeader
+                          ? brandKit.showDomainBadge
+                            ? brandKit.domainBadge
+                            : brandKit.brandName
+                          : ""}
                       </span>
                       <span className={lightText ? "text-white/75" : "text-zinc-700"}>
                         {idx + 1} / {slides.length} {idx < slides.length - 1 ? "→" : ""}
@@ -609,7 +937,7 @@ export const CarouselBuilderView: React.FC<CarouselBuilderViewProps> = ({
         <div>
           <span className="block text-[11px] text-zinc-400 mb-1.5">Slide Frame</span>
           <div className="grid grid-cols-3 gap-1">
-            {(["macos-dark", "browser", "glass", "none"] as FrameType[]).map((fr) => (
+            {(["macos-dark", "browser", "iphone", "glass", "none"] as FrameType[]).map((fr) => (
               <button
                 key={fr}
                 type="button"
@@ -620,7 +948,7 @@ export const CarouselBuilderView: React.FC<CarouselBuilderViewProps> = ({
                     : "bg-[#141419] border-[#22222A] text-zinc-400"
                 }`}
               >
-                {fr === "macos-dark" ? "macOS" : fr === "none" ? "Clean" : fr}
+                {fr === "macos-dark" ? "macOS" : fr === "none" ? "Clean" : fr === "iphone" ? "iPhone" : fr}
               </button>
             ))}
           </div>
@@ -643,17 +971,27 @@ export const CarouselBuilderView: React.FC<CarouselBuilderViewProps> = ({
 
         <div>
           <div className="flex items-center justify-between text-[11px] text-zinc-400 mb-1">
-            <span>Scale</span>
-            <span className="font-mono-tabular text-zinc-300">{activeSlide.scale}%</span>
+            <span>Screenshot Size (SS)</span>
+            <span className="font-mono-tabular text-zinc-200">{activeSlide.scale}%</span>
           </div>
           <input
             type="range"
-            min={70}
-            max={100}
+            min={50}
+            max={140}
             value={activeSlide.scale}
             onChange={(e) => updateSlide(activeIndex, { scale: Number(e.target.value) })}
             className="studio-slider"
           />
+          <button
+            type="button"
+            onClick={() => {
+              setSlides((prev) => prev.map((s) => ({ ...s, scale: activeSlide.scale })));
+              onNotify(`Applied ${activeSlide.scale}% SS size to all slides`);
+            }}
+            className="mt-1.5 w-full py-1 rounded bg-[#181820] hover:bg-[#22222C] border border-[#282834] text-[10px] font-medium text-zinc-300 cursor-pointer"
+          >
+            Apply Size ({activeSlide.scale}%) to All Slides
+          </button>
         </div>
       </aside>
     </div>

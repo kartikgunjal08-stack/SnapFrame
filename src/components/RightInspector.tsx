@@ -212,6 +212,19 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
                   );
                 })}
               </div>
+              {(state.frame === "macos-dark" ||
+                state.frame === "macos-light" ||
+                state.frame === "browser") && (
+                <label className="mt-2.5 flex items-center justify-between text-[11px] text-zinc-300 cursor-pointer">
+                  <span>Show Brand / URL Bar</span>
+                  <input
+                    type="checkbox"
+                    checked={state.showFrameHeader !== false}
+                    onChange={(e) => onUpdate({ showFrameHeader: e.target.checked })}
+                    className="accent-[#2563EB]"
+                  />
+                </label>
+              )}
             </section>
 
             <div className="h-px bg-[#1E1E24]" />
@@ -373,22 +386,20 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
               </div>
             </div>
 
-            {state.frame !== "iphone" && (
-              <div>
-                <div className="flex items-center justify-between text-[11px] text-zinc-400 mb-1">
-                  <span>Scale</span>
-                  <span className="font-mono-tabular text-zinc-300">{state.scale}%</span>
-                </div>
-                <input
-                  type="range"
-                  min={65}
-                  max={100}
-                  value={state.scale}
-                  onChange={(e) => onUpdate({ scale: Number(e.target.value) })}
-                  className="studio-slider"
-                />
+            <div>
+              <div className="flex items-center justify-between text-[11px] text-zinc-400 mb-1">
+                <span>Screenshot Size (SS)</span>
+                <span className="font-mono-tabular text-zinc-300">{state.scale}%</span>
               </div>
-            )}
+              <input
+                type="range"
+                min={45}
+                max={130}
+                value={state.scale}
+                onChange={(e) => onUpdate({ scale: Number(e.target.value) })}
+                className="studio-slider"
+              />
+            </div>
 
             <div>
               <span className="block text-[11px] text-zinc-400 mb-1.5">Shadow</span>

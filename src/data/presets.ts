@@ -647,6 +647,7 @@ export const INITIAL_STUDIO_STATE: StudioState = {
   activeSampleId: "saas",
   mockupData: DEFAULT_MOCKUP_DATA,
   frame: "macos-dark",
+  showFrameHeader: true,
   browserUrl: "app.snapframy.io/analytics",
   windowTitle: "Revenue Overview — Q4",
   aspectRatio: "16:10",

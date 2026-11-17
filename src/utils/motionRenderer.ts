@@ -5,6 +5,7 @@ import {
   MotionEasing,
   MotionPreset,
 } from "../types/studio";
+import { sanitizeHexColor } from "./brandKitStorage";
 
 export const MOTION_ASPECT_DIMENSIONS: Record<
   MotionAspectId,
@@ -69,15 +70,19 @@ function drawBackdrop(
   c3: string,
   pattern: BackdropPattern
 ) {
+  const safeC1 = sanitizeHexColor(c1, "#2563EB");
+  const safeC2 = sanitizeHexColor(c2, "#0F172A");
+  const safeC3 = sanitizeHexColor(c3, "#05070D");
+
   const base = ctx.createLinearGradient(0, 0, w, h);
-  base.addColorStop(0, c3);
-  base.addColorStop(0.55, c2);
-  base.addColorStop(1, c3);
+  base.addColorStop(0, safeC3);
+  base.addColorStop(0.55, safeC2);
+  base.addColorStop(1, safeC3);
   ctx.fillStyle = base;
   ctx.fillRect(0, 0, w, h);
 
   const g1 = ctx.createRadialGradient(w * 0.22, h * 0.2, 12, w * 0.22, h * 0.2, Math.max(w, h) * 0.62);
-  g1.addColorStop(0, c1);
+  g1.addColorStop(0, safeC1);
   g1.addColorStop(1, "rgba(0,0,0,0)");
   ctx.save();
   ctx.globalAlpha = 0.44;
@@ -159,7 +164,8 @@ function drawFramedMockup(
   titleLabel: string,
   accentColor: string,
   shimmerPos: number | null,
-  shadowScale: number
+  shadowScale: number,
+  showFrameHeader = true
 ) {
   ctx.save();
   ctx.shadowColor = "rgba(0,0,0,0.62)";
@@ -187,59 +193,64 @@ function drawFramedMockup(
 
   const radius = frameStyle === "iphone" ? 38 : 16;
   const chromeH =
-    frameStyle === "macos-dark" || frameStyle === "macos-light" || frameStyle === "browser" ? 34 : 0;
+    showFrameHeader &&
+    (frameStyle === "macos-dark" || frameStyle === "macos-light" || frameStyle === "browser")
+      ? 34
+      : 0;
 
   ctx.save();
   roundRect(ctx, x, y, w, h, radius);
   ctx.clip();
 
-  // Draw Frame Chrome
-  if (frameStyle === "macos-dark" || frameStyle === "macos-light") {
-    const isLight = frameStyle === "macos-light";
-    ctx.fillStyle = isLight ? "#F4F4F6" : "#1B1C22";
-    ctx.fillRect(x, y, w, chromeH);
-    ctx.strokeStyle = isLight ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.08)";
-    ctx.beginPath();
-    ctx.moveTo(x, y + chromeH);
-    ctx.lineTo(x + w, y + chromeH);
-    ctx.stroke();
-
-    ["#FF5F56", "#FFBD2E", "#27C93F"].forEach((dot, i) => {
-      ctx.fillStyle = dot;
+  // Draw Frame Chrome (removed completely when Show Brand / URL Bar is off)
+  if (showFrameHeader) {
+    if (frameStyle === "macos-dark" || frameStyle === "macos-light") {
+      const isLight = frameStyle === "macos-light";
+      ctx.fillStyle = isLight ? "#F4F4F6" : "#1B1C22";
+      ctx.fillRect(x, y, w, chromeH);
+      ctx.strokeStyle = isLight ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.08)";
       ctx.beginPath();
-      ctx.arc(x + 18 + i * 16, y + chromeH / 2, 4.8, 0, Math.PI * 2);
-      ctx.fill();
-    });
+      ctx.moveTo(x, y + chromeH);
+      ctx.lineTo(x + w, y + chromeH);
+      ctx.stroke();
 
-    ctx.fillStyle = isLight ? "#52525B" : "#94A3B8";
-    ctx.font = "600 11px 'DM Sans', sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText(titleLabel, x + w / 2, y + 21);
-  } else if (frameStyle === "browser") {
-    ctx.fillStyle = "#16171C";
-    ctx.fillRect(x, y, w, chromeH);
-    ctx.strokeStyle = "rgba(255,255,255,0.08)";
-    ctx.beginPath();
-    ctx.moveTo(x, y + chromeH);
-    ctx.lineTo(x + w, y + chromeH);
-    ctx.stroke();
+      ["#FF5F56", "#FFBD2E", "#27C93F"].forEach((dot, i) => {
+        ctx.fillStyle = dot;
+        ctx.beginPath();
+        ctx.arc(x + 18 + i * 16, y + chromeH / 2, 4.8, 0, Math.PI * 2);
+        ctx.fill();
+      });
 
-    for (let i = 0; i < 3; i++) {
-      ctx.fillStyle = "#52525B";
+      ctx.fillStyle = isLight ? "#52525B" : "#94A3B8";
+      ctx.font = "600 11px 'DM Sans', sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(titleLabel, x + w / 2, y + 21);
+    } else if (frameStyle === "browser") {
+      ctx.fillStyle = "#16171C";
+      ctx.fillRect(x, y, w, chromeH);
+      ctx.strokeStyle = "rgba(255,255,255,0.08)";
       ctx.beginPath();
-      ctx.arc(x + 18 + i * 14, y + chromeH / 2, 4.2, 0, Math.PI * 2);
+      ctx.moveTo(x, y + chromeH);
+      ctx.lineTo(x + w, y + chromeH);
+      ctx.stroke();
+
+      for (let i = 0; i < 3; i++) {
+        ctx.fillStyle = "#52525B";
+        ctx.beginPath();
+        ctx.arc(x + 18 + i * 14, y + chromeH / 2, 4.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      const barW = Math.min(280, w * 0.45);
+      roundRect(ctx, x + (w - barW) / 2, y + 6, barW, 22, 6);
+      ctx.fillStyle = "rgba(255,255,255,0.06)";
       ctx.fill();
+
+      ctx.fillStyle = "#CBD5E1";
+      ctx.font = "500 10.5px 'JetBrains Mono', monospace";
+      ctx.textAlign = "center";
+      ctx.fillText(domainLabel, x + w / 2, y + 20);
     }
-
-    const barW = Math.min(280, w * 0.45);
-    roundRect(ctx, x + (w - barW) / 2, y + 6, barW, 22, 6);
-    ctx.fillStyle = "rgba(255,255,255,0.06)";
-    ctx.fill();
-
-    ctx.fillStyle = "#CBD5E1";
-    ctx.font = "500 10.5px 'JetBrains Mono', monospace";
-    ctx.textAlign = "center";
-    ctx.fillText(domainLabel, x + w / 2, y + 20);
   }
 
   // Draw Image / Screenshot inside content box (contain/cover without text distortion)
@@ -325,6 +336,8 @@ export interface RenderMotionFrameParams {
   showHeadline: boolean;
   brandKit?: BrandKit;
   useBrandKit: boolean;
+  mockupScale?: number; // 55..140 percentage
+  showFrameHeader?: boolean;
 }
 
 export function renderMotionFrame({
@@ -341,15 +354,21 @@ export function renderMotionFrame({
   showHeadline,
   brandKit,
   useBrandKit,
+  mockupScale = 100,
+  showFrameHeader = true,
 }: RenderMotionFrameParams) {
   const m = preset.motion;
   const p = evaluateEasing(progress, easing);
   const fonts = getFontFamily(useBrandKit ? brandKit : undefined);
 
-  const primaryColor =
-    useBrandKit && brandKit ? brandKit.primaryColor : preset.backdropColors[0];
-  const secondaryColor =
-    useBrandKit && brandKit ? brandKit.secondaryAccent : preset.backdropColors[0];
+  const primaryColor = sanitizeHexColor(
+    useBrandKit && brandKit ? brandKit.primaryColor : preset.backdropColors[0],
+    preset.backdropColors[0]
+  );
+  const secondaryColor = sanitizeHexColor(
+    useBrandKit && brandKit ? brandKit.secondaryAccent : preset.backdropColors[0],
+    preset.backdropColors[0]
+  );
   const domainLabel =
     useBrandKit && brandKit?.domainBadge ? brandKit.domainBadge : "snapframy.app";
   const brandTitle =
@@ -400,23 +419,38 @@ export function renderMotionFrame({
 
   // 3. Mockup Geometry & Motion Math
   const isPhone = preset.frameStyle === "iphone";
-  const availW = width * 0.78;
-  const availH = height - headerH - 72;
+  const userScale = Math.max(0.45, Math.min(1.5, mockupScale / 100));
+  const availW = width * 0.82;
+  const availH = height - headerH - 64;
 
-  let cardW = isPhone ? Math.min(300, availW * 0.45) : Math.min(820, availW);
-  let cardH = isPhone ? Math.min(580, availH * 0.92) : Math.min(500, availH * 0.88);
-
-  if (!isPhone && img && img.naturalWidth > 0) {
-    const natRatio = img.naturalWidth / img.naturalHeight;
-    const targetBoxRatio = cardW / cardH;
-    if (natRatio > targetBoxRatio) {
-      cardH = Math.max(240, Math.min(cardH, cardW / natRatio + 34));
-    } else {
-      cardW = Math.max(300, Math.min(cardW, (cardH - 34) * natRatio));
+  let cardW: number;
+  let cardH: number;
+  if (isPhone) {
+    cardH = Math.min(availH * 0.92, height > width ? 820 : 540);
+    cardW = Math.min(availW * 0.72, cardH * 0.49);
+    cardH = cardW / 0.49;
+  } else {
+    cardW = Math.min(840, availW);
+    cardH = Math.min(520, availH * 0.88);
+    const chromeReserve =
+      showFrameHeader &&
+      (preset.frameStyle === "macos-dark" ||
+        preset.frameStyle === "macos-light" ||
+        preset.frameStyle === "browser")
+        ? 34
+        : 0;
+    if (img && img.naturalWidth > 0) {
+      const natRatio = img.naturalWidth / img.naturalHeight;
+      const targetBoxRatio = cardW / cardH;
+      if (natRatio > targetBoxRatio) {
+        cardH = Math.max(240, Math.min(cardH, cardW / natRatio + chromeReserve));
+      } else {
+        cardW = Math.max(300, Math.min(cardW, (cardH - chromeReserve) * natRatio));
+      }
     }
   }
 
-  const scale = m.startScale + (m.endScale - m.startScale) * p;
+  const scale = (m.startScale + (m.endScale - m.startScale) * p) * userScale;
   const offsetX = (m.startX + (m.endX - m.startX) * p) * width;
   const floatY =
     m.floatFreq > 0 ? Math.sin(progress * Math.PI * 2 * m.floatFreq) * m.floatAmpY : 0;
@@ -479,7 +513,8 @@ export function renderMotionFrame({
       brandTitle,
       primaryColor,
       null,
-      0.7
+      0.7,
+      showFrameHeader
     );
     ctx.restore();
   }
@@ -503,7 +538,8 @@ export function renderMotionFrame({
     brandTitle,
     primaryColor,
     shimmerPos,
-    shadowScale
+    shadowScale,
+    showFrameHeader
   );
   ctx.restore();
 
@@ -530,13 +566,14 @@ export function renderMotionFrame({
       brandTitle,
       primaryColor,
       shimmerPos,
-      0.9
+      0.9,
+      showFrameHeader
     );
     ctx.restore();
   }
 
   // 4. Optional Brand Kit Badge & Logo Watermark (bottom-right)
-  if (useBrandKit && brandKit && (brandKit.showDomainBadge || logoImg)) {
+  if (showFrameHeader && useBrandKit && brandKit && (brandKit.showDomainBadge || logoImg)) {
     ctx.save();
     const badgeY = height - 24;
     let cursorX = width - 26;

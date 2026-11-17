@@ -1,11 +1,11 @@
 import React, { useMemo, useState } from "react";
-import { ArrowRight, Search, X } from "lucide-react";
+import { ArrowRight, Search, Smartphone, X } from "lucide-react";
 import { BACKGROUND_PRESETS, SceneTemplate, TemplateCategory } from "../data/presets";
 import { SCENE_TEMPLATES } from "../data/templates";
 import { FrameType } from "../types/studio";
 
 interface TemplatesViewProps {
-  onApplyTemplate: (template: SceneTemplate) => void;
+  onApplyTemplate: (template: SceneTemplate, asPhoneFormat?: boolean) => void;
 }
 
 const CATEGORIES: ("All" | TemplateCategory)[] = [
@@ -36,6 +36,7 @@ const INITIAL_PAGE_SIZE = 24;
 export const TemplatesView: React.FC<TemplatesViewProps> = ({ onApplyTemplate }) => {
   const [selectedCategory, setSelectedCategory] = useState<"All" | TemplateCategory>("All");
   const [selectedFrame, setSelectedFrame] = useState<"all" | FrameType>("all");
+  const [phoneFormatMode, setPhoneFormatMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [visibleLimit, setVisibleLimit] = useState(INITIAL_PAGE_SIZE);
 
@@ -141,7 +142,20 @@ export const TemplatesView: React.FC<TemplatesViewProps> = ({ onApplyTemplate })
             })}
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0 flex-wrap">
+            <button
+              type="button"
+              onClick={() => setPhoneFormatMode((v) => !v)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border transition-colors whitespace-nowrap cursor-pointer ${
+                phoneFormatMode
+                  ? "bg-[#2563EB]/20 border-[#3B82F6] text-white"
+                  : "bg-[#141419] border-[#22222A] text-zinc-300 hover:border-[#343442]"
+              }`}
+              title="Preview & open every template in vertical iPhone 9:16 format"
+            >
+              <Smartphone className="w-3.5 h-3.5 text-[#60A5FA]" />
+              Phone Format (9:16)
+            </button>
             <label htmlFor="frame-filter" className="text-xs text-zinc-500 whitespace-nowrap">
               Frame
             </label>
@@ -212,9 +226,9 @@ export const TemplatesView: React.FC<TemplatesViewProps> = ({ onApplyTemplate })
                 const bg =
                   BACKGROUND_PRESETS.find((b) => b.id === tpl.patch.backgroundId) ||
                   BACKGROUND_PRESETS[0];
-                const isPhone = tpl.patch.frame === "iphone";
-                const isTablet = tpl.patch.frame === "tablet";
-                const isGlass = tpl.patch.frame === "glass";
+                const isPhone = phoneFormatMode || tpl.patch.frame === "iphone";
+                const isTablet = !phoneFormatMode && tpl.patch.frame === "tablet";
+                const isGlass = !phoneFormatMode && tpl.patch.frame === "glass";
                 const pat = tpl.patch.pattern;
 
                 const miniPatternStyle: React.CSSProperties | undefined =
@@ -302,9 +316,13 @@ export const TemplatesView: React.FC<TemplatesViewProps> = ({ onApplyTemplate })
                         <div className="flex items-center gap-2 text-xs text-zinc-500 mb-1.5">
                           <span>{tpl.category}</span>
                           <span aria-hidden="true">·</span>
-                          <span className="font-mono-tabular">{tpl.patch.aspectRatio}</span>
+                          <span className="font-mono-tabular">
+                            {phoneFormatMode ? "9:16" : tpl.patch.aspectRatio}
+                          </span>
                           <span aria-hidden="true">·</span>
-                          <span className="capitalize">{tpl.patch.frame}</span>
+                          <span className="capitalize">
+                            {phoneFormatMode ? "iphone" : tpl.patch.frame}
+                          </span>
                         </div>
                         <h2 className="font-display text-base font-semibold text-white">
                           {tpl.name}
@@ -314,14 +332,27 @@ export const TemplatesView: React.FC<TemplatesViewProps> = ({ onApplyTemplate })
                         </p>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() => onApplyTemplate(tpl)}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-[#1A1A22] hover:bg-[#2563EB] border border-[#2A2A35] hover:border-[#3B82F6] text-xs font-medium text-white transition-colors whitespace-nowrap cursor-pointer"
-                      >
-                        Open in Studio
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => onApplyTemplate(tpl, phoneFormatMode)}
+                          className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-[#1A1A22] hover:bg-[#2563EB] border border-[#2A2A35] hover:border-[#3B82F6] text-xs font-medium text-white transition-colors whitespace-nowrap cursor-pointer"
+                        >
+                          {phoneFormatMode ? "Open as Phone" : "Open in Studio"}
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                        {!phoneFormatMode && tpl.patch.frame !== "iphone" && (
+                          <button
+                            type="button"
+                            onClick={() => onApplyTemplate(tpl, true)}
+                            title="Convert & open this template in vertical Phone format (iPhone · 9:16)"
+                            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-[#15151C] hover:bg-[#1F2433] border border-[#2A2A36] hover:border-[#3B82F6]/60 text-xs font-medium text-zinc-200 transition-colors whitespace-nowrap cursor-pointer shrink-0"
+                          >
+                            <Smartphone className="w-3.5 h-3.5 text-[#60A5FA]" />
+                            Phone
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 );

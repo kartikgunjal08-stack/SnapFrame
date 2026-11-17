@@ -29,6 +29,7 @@ interface FilmRecipe {
   cinemaBars: boolean;
   tiltAngle: number;
   speedCurve: "snap" | "cinematic" | "hyper";
+  defaultAspect?: "16:9" | "9:16" | "1:1" | "16:10";
 }
 
 const RECIPES: FilmRecipe[] = [
@@ -741,10 +742,137 @@ const RECIPES: FilmRecipe[] = [
     tiltAngle: 10,
     speedCurve: "cinematic",
   },
+  // Dedicated Mobile Phone & Vertical Reels Brand Commercials
+  {
+    slug: "reels-iphone-app-tour",
+    name: "9:16 iPhone App Reel Spot",
+    category: "Mobile Phone & Reels",
+    description:
+      "Vertical iPhone flagship commercial with Dynamic Island frame, spring hook, multi-screen montage & mobile offer CTA.",
+    choreography: "whip-cut",
+    transition: "whip-pan",
+    frameStyle: "iphone",
+    palette: ["#3B82F6", "#0D1528", "#05070D"],
+    pattern: "spotlight",
+    defaultDuration: 30,
+    commercialArc: true,
+    motionBlurTrails: true,
+    flashBeats: true,
+    chromaticSplit: true,
+    floorReflection: true,
+    kineticText: true,
+    particlesEnabled: true,
+    cursorSpotlight: true,
+    cinemaBars: false,
+    tiltAngle: 10,
+    speedCurve: "snap",
+    defaultAspect: "9:16",
+  },
+  {
+    slug: "tiktok-viral-phone-cut",
+    name: "TikTok Viral Phone Launch",
+    category: "Mobile Phone & Reels",
+    description:
+      "High-energy 9:16 iPhone showcase with beat-flash whip cuts and bold kinetic captions for TikTok & Reels.",
+    choreography: "diagonal-split",
+    transition: "flash-cut",
+    frameStyle: "iphone",
+    palette: ["#F43F5E", "#1F0D24", "#08050B"],
+    pattern: "dots",
+    defaultDuration: 15,
+    commercialArc: true,
+    motionBlurTrails: true,
+    flashBeats: true,
+    chromaticSplit: true,
+    floorReflection: false,
+    kineticText: true,
+    particlesEnabled: true,
+    cursorSpotlight: true,
+    cinemaBars: false,
+    tiltAngle: 12,
+    speedCurve: "hyper",
+    defaultAspect: "9:16",
+  },
+  {
+    slug: "shorts-fintech-phone-story",
+    name: "Shorts Fintech Mobile Spot",
+    category: "Mobile Phone & Reels",
+    description:
+      "Clean emerald iPhone promo crafted for YouTube Shorts & Instagram Reels with KPI slam and brand CTA.",
+    choreography: "orbit-3d",
+    transition: "cube-swing",
+    frameStyle: "iphone",
+    palette: ["#10B981", "#071E18", "#040A08"],
+    pattern: "rings",
+    defaultDuration: 30,
+    commercialArc: true,
+    motionBlurTrails: false,
+    flashBeats: false,
+    chromaticSplit: false,
+    floorReflection: true,
+    kineticText: true,
+    particlesEnabled: true,
+    cursorSpotlight: true,
+    cinemaBars: false,
+    tiltAngle: 8,
+    speedCurve: "cinematic",
+    defaultAspect: "9:16",
+  },
+  {
+    slug: "mobile-onboarding-story",
+    name: "9:16 App Onboarding Walkthrough",
+    category: "Mobile Phone & Reels",
+    description:
+      "Smooth domino-cascade mobile screen walkthrough showing onboarding steps inside vertical iPhone bezels.",
+    choreography: "domino-cascade",
+    transition: "iris-wipe",
+    frameStyle: "iphone",
+    palette: ["#8B5CF6", "#160F29", "#07050C"],
+    pattern: "grid",
+    defaultDuration: 20,
+    commercialArc: true,
+    motionBlurTrails: true,
+    flashBeats: false,
+    chromaticSplit: false,
+    floorReflection: true,
+    kineticText: true,
+    particlesEnabled: true,
+    cursorSpotlight: true,
+    cinemaBars: false,
+    tiltAngle: 9,
+    speedCurve: "cinematic",
+    defaultAspect: "9:16",
+  },
+  {
+    slug: "creator-app-hook-reel",
+    name: "Creator App Promo Reel 9:16",
+    category: "Mobile Phone & Reels",
+    description:
+      "Vertical creator-sponsorship iPhone spot with shutter-slice transitions, amber spotlight & promo code CTA.",
+    choreography: "shutter-slice",
+    transition: "flash-cut",
+    frameStyle: "iphone",
+    palette: ["#F59E0B", "#261708", "#080604"],
+    pattern: "spotlight",
+    defaultDuration: 30,
+    commercialArc: true,
+    motionBlurTrails: true,
+    flashBeats: true,
+    chromaticSplit: true,
+    floorReflection: true,
+    kineticText: true,
+    particlesEnabled: true,
+    cursorSpotlight: true,
+    cinemaBars: false,
+    tiltAngle: 10,
+    speedCurve: "snap",
+    defaultAspect: "9:16",
+  },
 ];
 
-// 30 Director Recipes x 2 Pacing/Frame Permutations = 60 Pro Short Film & 30s Brand Deal Templates
+// 35 Director Recipes x 2 Pacing/Frame Permutations = 70 Pro Short Film & 30s Brand Deal Templates
 export const SHORT_FILM_PRESETS: ShortFilmPreset[] = RECIPES.flatMap((rec, idx) => {
+  const isMobileRecipe = rec.category === "Mobile Phone & Reels";
   const base: ShortFilmPreset = {
     id: `film-${rec.slug}-pro`,
     name: rec.name,
@@ -767,6 +895,7 @@ export const SHORT_FILM_PRESETS: ShortFilmPreset[] = RECIPES.flatMap((rec, idx) 
     cinemaBars: rec.cinemaBars,
     tiltAngle: rec.tiltAngle,
     speedCurve: rec.speedCurve,
+    defaultAspect: rec.defaultAspect || (isMobileRecipe ? "9:16" : undefined),
   };
 
   const altFrames: ShortFilmPreset["frameStyle"][] = [
@@ -777,7 +906,7 @@ export const SHORT_FILM_PRESETS: ShortFilmPreset[] = RECIPES.flatMap((rec, idx) 
     "frameless",
     "macos-light",
   ];
-  const altFrame = altFrames[(idx + 2) % altFrames.length];
+  const altFrame = isMobileRecipe ? "iphone" : altFrames[(idx + 2) % altFrames.length];
 
   const remix: ShortFilmPreset = {
     ...base,
@@ -787,9 +916,10 @@ export const SHORT_FILM_PRESETS: ShortFilmPreset[] = RECIPES.flatMap((rec, idx) 
     defaultDuration: rec.defaultDuration === 30 ? 20 : 30,
     chromaticSplit: !rec.chromaticSplit,
     flashBeats: true,
-    cinemaBars: !rec.cinemaBars,
+    cinemaBars: isMobileRecipe ? false : !rec.cinemaBars,
     tiltAngle: -rec.tiltAngle,
     speedCurve: rec.speedCurve === "cinematic" ? "snap" : "hyper",
+    defaultAspect: rec.defaultAspect || (isMobileRecipe ? "9:16" : undefined),
   };
 
   return [base, remix];
@@ -797,6 +927,7 @@ export const SHORT_FILM_PRESETS: ShortFilmPreset[] = RECIPES.flatMap((rec, idx) 
 
 export const SHORT_FILM_CATEGORIES: ("All" | ShortFilmCategory)[] = [
   "All",
+  "Mobile Phone & Reels",
   "Apple Keynote & Hardware",
   "Linear & Stripe Launch",
   "Kinetic Typography Edits",

@@ -1,7 +1,5 @@
 import { SetStateAction, useCallback, useEffect, useRef, useState } from "react";
-import { Undo2, Redo2, User as UserIcon } from "lucide-react";
-import { AuthModal } from "./components/AuthModal";
-import { AuthPage } from "./components/AuthPage";
+import { Undo2, Redo2 } from "lucide-react";
 import { BrandKitPanel } from "./components/BrandKitPanel";
 import { CarouselBuilderView } from "./components/CarouselBuilderView";
 import { GuideView } from "./components/GuideView";
@@ -35,9 +33,7 @@ import {
   saveBrandKit,
 } from "./utils/brandKitStorage";
 import { copyElementToClipboard, exportElementToImage } from "./utils/exportCanvas";
-import { useAuth } from "./hooks/useAuth";
 import { useGlobalHistory } from "./hooks/useGlobalHistory";
-import { fetchCloudBrandKit } from "./utils/supabaseSync";
 
 const COALESCEABLE_STUDIO_KEYS = new Set<keyof StudioState>([
   "padding",
@@ -75,11 +71,6 @@ function describeStudioPatch(patch: Partial<StudioState>): string {
 export default function App() {
   const [activeView, setActiveView] = useState<AppView>("studio");
   const [brandKitOpen, setBrandKitOpen] = useState(false);
-  const [authOpen, setAuthOpen] = useState(false);
-  const [localPreviewBypass, setLocalPreviewBypass] = useState(false);
-
-  const auth = useAuth();
-  const syncedUserIdRef = useRef<string | null>(null);
 
   const {
     present,
@@ -117,32 +108,6 @@ export default function App() {
   useEffect(() => {
     saveBrandKit(brandKit);
   }, [brandKit]);
-
-  // Hydrate cloud Brand Kit once when a user signs in
-  useEffect(() => {
-    const uid = auth.user?.id ?? null;
-    if (!uid) {
-      syncedUserIdRef.current = null;
-      return;
-    }
-    if (syncedUserIdRef.current === uid) return;
-    syncedUserIdRef.current = uid;
-
-    fetchCloudBrandKit(uid)
-      .then((cloudKit) => {
-        if (!cloudKit) return;
-        commit(
-          (curr) => ({
-            ...curr,
-            brandKit: cloudKit,
-          }),
-          { label: "Sync cloud Brand Kit", record: false }
-        );
-      })
-      .catch(() => {
-        // Non-fatal if user hasn't created tables yet
-      });
-  }, [auth.user?.id, commit]);
 
   const showNotice = useCallback((text: string, type: "info" | "error" = "info") => {
     setNotice({ text, type });
@@ -419,12 +384,20 @@ export default function App() {
     );
   };
 
-  const handleApplyTemplate = (template: SceneTemplate) => {
+  const handleApplyTemplate = (template: SceneTemplate, asPhoneFormat = false) => {
     commit(
       (curr) => {
         const merged: StudioState = {
           ...curr.studioState,
           ...template.patch,
+          ...(asPhoneFormat
+            ? {
+                frame: "iphone",
+                aspectRatio: "9:16",
+                padding: 36,
+                scale: 94,
+              }
+            : {}),
           safeZoneId: "none",
           showSafeZone: false,
         };
@@ -435,10 +408,18 @@ export default function App() {
             : merged,
         };
       },
-      { label: `Template: ${template.name}` }
+      {
+        label: asPhoneFormat
+          ? `Template (Phone): ${template.name}`
+          : `Template: ${template.name}`,
+      }
     );
     setActiveView("studio");
-    showNotice(`Applied "${template.name}" template`);
+    showNotice(
+      asPhoneFormat
+        ? `Applied "${template.name}" in Phone Format (9:16)`
+        : `Applied "${template.name}" template`
+    );
   };
 
   const handleExportDownload = async () => {
@@ -632,56 +613,6 @@ export default function App() {
     { id: "guide", label: "Guide" },
   ];
 
-  // First-visit SaaS Auth Gate:
-  // Enforces Email + Password + Purchased Redeem Code when Supabase is configured.
-  // Before Supabase keys are added, still shows the Auth Page with a Local Preview button.
-  const shouldShowAuthGate =
-    APP_CONFIG.requireRedeemAuth &&
-    (auth.isConfigured
-      ? !auth.user || !auth.isRedeemed
-      : !localPreviewBypass);
-
-  if (auth.isConfigured && auth.loading) {
-    return (
-      <div className="min-h-screen bg-[#0A0A0C] text-zinc-400 flex items-center justify-center text-xs font-mono-tabular">
-        Verifying session...
-      </div>
-    );
-  }
-
-  if (shouldShowAuthGate) {
-    return (
-      <>
-        <AuthPage
-          isConfigured={auth.isConfigured}
-          user={auth.user}
-          profile={auth.profile}
-          onSignInPassword={auth.signInWithPassword}
-          onSignUpWithCode={auth.signUpWithRedeemCode}
-          onClaimRedeemCode={auth.claimRedeemCode}
-          onResetPassword={auth.resetPassword}
-          onSignOut={auth.signOut}
-          onEnterLocalPreview={
-            !auth.isConfigured ? () => setLocalPreviewBypass(true) : undefined
-          }
-          onNotify={showNotice}
-        />
-        {notice && (
-          <div
-            role="status"
-            className={`fixed bottom-5 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-lg text-xs font-medium border shadow-xl transition-opacity ${
-              notice.type === "error"
-                ? "bg-red-950/90 border-red-700/60 text-red-100"
-                : "bg-[#18181F]/95 border-[#2C2C38] text-zinc-100"
-            }`}
-          >
-            {notice.text}
-          </div>
-        )}
-      </>
-    );
-  }
-
   return (
     <div className="min-h-screen lg:h-screen flex flex-col bg-[#0A0A0C] text-[#F4F4F6] lg:overflow-hidden">
       {/* Top Bar — Strict 3-Zone Contract */}
@@ -764,30 +695,6 @@ export default function App() {
               Brand Kit
             </button>
           )}
-
-          {/* Account / Redeem Code Button */}
-          <button
-            type="button"
-            onClick={() => setAuthOpen(true)}
-            className="flex items-center gap-1.5 px-2.5 py-2 rounded-lg bg-[#141419] hover:bg-[#1C1C24] border border-[#24242E] text-xs font-medium text-zinc-200 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
-            title={
-              auth.user?.email
-                ? `Signed in as ${auth.user.email} (${auth.profile?.plan || "pending"})`
-                : "Redeem Code / Email Sign In"
-            }
-          >
-            <UserIcon className="w-3.5 h-3.5 text-[#60A5FA]" />
-            <span className="hidden sm:inline max-w-[120px] truncate">
-              {auth.user
-                ? auth.user.email?.split("@")[0] || "Account"
-                : "Redeem / Sign In"}
-            </span>
-            {auth.user && auth.isRedeemed && (
-              <span className="hidden md:inline px-1.5 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/40 text-[9px] font-mono-tabular uppercase text-emerald-300">
-                {auth.profile?.plan || "pro"}
-              </span>
-            )}
-          </button>
         </div>
       </header>
 
@@ -907,31 +814,6 @@ export default function App() {
         onChange={handleUpdateBrandKit}
         onApplyToWorkspace={handleApplyBrandKitToWorkspace}
         onClose={() => setBrandKitOpen(false)}
-      />
-
-      {/* Account & Cloud Sync Modal */}
-      <AuthModal
-        open={authOpen}
-        isConfigured={auth.isConfigured}
-        user={auth.user}
-        profile={auth.profile}
-        currentStudioState={state}
-        brandKit={brandKit}
-        onClose={() => setAuthOpen(false)}
-        onSignOut={auth.signOut}
-        onOpenAuthGate={() => setLocalPreviewBypass(false)}
-        onLoadStudioSnapshot={(loadedState, name) => {
-          commit(
-            (curr) => ({
-              ...curr,
-              studioState: loadedState,
-            }),
-            { label: `Load cloud: ${name}` }
-          );
-          setActiveView("studio");
-          showNotice(`Loaded "${name}" from cloud`);
-        }}
-        onNotify={showNotice}
       />
 
       {/* Non-blocking Toast Feedback */}

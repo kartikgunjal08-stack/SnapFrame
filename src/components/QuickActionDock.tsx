@@ -222,14 +222,37 @@ export const QuickActionDock: React.FC<QuickActionDockProps> = ({
 
         {/* Context-Specific Direct Tools */}
         {selectedElement === "device" && (
-          <button
-            type="button"
-            onClick={handleCycleFrame}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#1A1A23] hover:bg-[#232330] border border-[#2A2A36] text-xs font-medium text-zinc-200 whitespace-nowrap shrink-0 cursor-pointer"
-          >
-            <Layers className="w-3.5 h-3.5 text-zinc-400" />
-            Frame: {state.frame}
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={handleCycleFrame}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#1A1A23] hover:bg-[#232330] border border-[#2A2A36] text-xs font-medium text-zinc-200 whitespace-nowrap shrink-0 cursor-pointer"
+            >
+              <Layers className="w-3.5 h-3.5 text-zinc-400" />
+              Frame: {state.frame}
+            </button>
+            <div className="flex items-center rounded-lg bg-[#1A1A23] border border-[#2A2A36] shrink-0">
+              <button
+                type="button"
+                onClick={() => onUpdate({ scale: Math.max(45, state.scale - 6) })}
+                className="px-2 py-1.5 text-xs font-mono-tabular text-zinc-300 hover:text-white cursor-pointer"
+                title="Decrease screenshot size"
+              >
+                -
+              </button>
+              <span className="px-1.5 text-[11px] font-mono-tabular text-zinc-300">
+                {state.scale}%
+              </span>
+              <button
+                type="button"
+                onClick={() => onUpdate({ scale: Math.min(130, state.scale + 6) })}
+                className="px-2 py-1.5 text-xs font-mono-tabular text-zinc-300 hover:text-white cursor-pointer"
+                title="Increase screenshot size"
+              >
+                +
+              </button>
+            </div>
+          </>
         )}
 
         {selectedElement === "caption" && (

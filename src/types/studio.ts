@@ -211,6 +211,7 @@ export interface StudioState {
   activeSampleId: SampleId | null;
   mockupData: MockupContentData;
   frame: FrameType;
+  showFrameHeader?: boolean;
   browserUrl: string;
   windowTitle: string;
   aspectRatio: AspectRatioId;
@@ -244,6 +245,7 @@ export interface StudioState {
 /* ---------------- Motion / Video Template Types ---------------- */
 
 export type MotionCategory =
+  | "Mobile Phone & Reels"
   | "3D Card Flips & Reveals"
   | "Camera & Pan Motions"
   | "Multi-Device & Floating Elements"
@@ -286,6 +288,7 @@ export interface MotionPreset {
   description: string;
   defaultDuration: MotionDuration;
   defaultEasing: MotionEasing;
+  defaultAspect?: MotionAspectId;
   frameStyle: "macos-dark" | "macos-light" | "browser" | "iphone" | "glass" | "frameless";
   backdropColors: [string, string, string];
   pattern: BackdropPattern;
@@ -296,7 +299,12 @@ export interface MotionPreset {
 
 /* ---------------- Continuous Carousel Builder Types ---------------- */
 
-export type CarouselFormat = "linkedin-4x5" | "product-hunt" | "x-16x9" | "square-1x1";
+export type CarouselFormat =
+  | "linkedin-4x5"
+  | "mobile-9x16"
+  | "product-hunt"
+  | "x-16x9"
+  | "square-1x1";
 
 export interface CarouselSlide {
   id: string;
@@ -315,6 +323,7 @@ export interface CarouselSlide {
 /* ---------------- Short Film Motions (Multi-Screenshot Pro Editor) ---------------- */
 
 export type ShortFilmCategory =
+  | "Mobile Phone & Reels"
   | "Apple Keynote & Hardware"
   | "Linear & Stripe Launch"
   | "Kinetic Typography Edits"
@@ -395,6 +404,7 @@ export interface ShortFilmPreset {
   description: string;
   choreography: ShortFilmChoreography;
   transition: ShortFilmTransition;
+  defaultAspect?: Exclude<MotionAspectId, "4:5">;
   frameStyle: "macos-dark" | "macos-light" | "browser" | "iphone" | "glass" | "frameless";
   palette: [string, string, string];
   pattern: BackdropPattern;

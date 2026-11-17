@@ -19,6 +19,9 @@ import {
   Aperture,
   BookmarkPlus,
   Crosshair,
+  Smartphone,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { SAMPLE_MOCKUPS } from "../data/presets";
 import { SHORT_FILM_CATEGORIES, SHORT_FILM_PRESETS } from "../data/shortFilmPresets";
@@ -131,6 +134,9 @@ export const ShortFilmStudioView: React.FC<ShortFilmStudioViewProps> = ({
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>("deal");
 
   const [aspectId, setAspectId] = useState<FilmAspect>("16:9");
+  const [phoneFormatMode, setPhoneFormatMode] = useState(false);
+  const [mockupScale, setMockupScale] = useState(100);
+  const [showBrandHeader, setShowBrandHeader] = useState(true);
   const [duration, setDuration] = useState<ShortFilmDuration>(SHORT_FILM_PRESETS[0].defaultDuration);
   const [useBrandKit, setUseBrandKit] = useState(true);
   const [activeShotIndex, setActiveShotIndex] = useState(0);
@@ -209,6 +215,7 @@ export const ShortFilmStudioView: React.FC<ShortFilmStudioViewProps> = ({
   const effectivePreset: ShortFilmPreset = useMemo(
     () => ({
       ...preset,
+      frameStyle: phoneFormatMode ? "iphone" : preset.frameStyle,
       commercialArc,
       motionBlurTrails,
       flashBeats,
@@ -229,6 +236,7 @@ export const ShortFilmStudioView: React.FC<ShortFilmStudioViewProps> = ({
       kineticText,
       motionBlurTrails,
       particlesEnabled,
+      phoneFormatMode,
       preset,
     ]
   );
@@ -265,6 +273,8 @@ export const ShortFilmStudioView: React.FC<ShortFilmStudioViewProps> = ({
         filmLook,
         brandKit,
         useBrandKit,
+        mockupScale,
+        showBrandHeader,
       });
     },
     [
@@ -275,7 +285,9 @@ export const ShortFilmStudioView: React.FC<ShortFilmStudioViewProps> = ({
       duration,
       effectivePreset,
       filmLook,
+      mockupScale,
       shots,
+      showBrandHeader,
       useBrandKit,
     ]
   );
@@ -357,6 +369,12 @@ export const ShortFilmStudioView: React.FC<ShortFilmStudioViewProps> = ({
   const applyPreset = (p: ShortFilmPreset) => {
     setPreset(p);
     setDuration(p.defaultDuration);
+    if (p.defaultAspect === "9:16" || p.category === "Mobile Phone & Reels") {
+      setPhoneFormatMode(true);
+      setAspectId("9:16");
+    } else if (phoneFormatMode) {
+      setAspectId("9:16");
+    }
     setCommercialArc(p.commercialArc);
     setMotionBlurTrails(p.motionBlurTrails);
     setFlashBeats(p.flashBeats);
@@ -370,6 +388,19 @@ export const ShortFilmStudioView: React.FC<ShortFilmStudioViewProps> = ({
     lastStepRef.current = -1;
     setCurrentTime(0);
     setIsPlaying(true);
+  };
+
+  const togglePhoneFormat = () => {
+    setPhoneFormatMode((prev) => {
+      const next = !prev;
+      if (next) {
+        setAspectId("9:16");
+        onNotify("Converted Short Film to Mobile Phone Format (9:16 · iPhone)");
+      } else {
+        setAspectId("16:9");
+      }
+      return next;
+    });
   };
 
   const saveCurrentClientProfile = () => {
@@ -619,6 +650,8 @@ export const ShortFilmStudioView: React.FC<ShortFilmStudioViewProps> = ({
         filmLook,
         brandKit,
         useBrandKit,
+        mockupScale,
+        showBrandHeader,
       });
       frames.push(offCtx.getImageData(0, 0, gw, gh));
       setExportState({
@@ -735,7 +768,7 @@ export const ShortFilmStudioView: React.FC<ShortFilmStudioViewProps> = ({
             </span>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0 flex-wrap">
             <input
               ref={multiUploadRef}
               type="file"
@@ -747,6 +780,38 @@ export const ShortFilmStudioView: React.FC<ShortFilmStudioViewProps> = ({
               }}
               className="hidden"
             />
+            <button
+              type="button"
+              disabled={exportState.active}
+              onClick={() => setShowBrandHeader((v) => !v)}
+              title="Show or hide Brand Name / URL / Act header labels"
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium border cursor-pointer whitespace-nowrap transition-colors ${
+                showBrandHeader
+                  ? "bg-[#2563EB]/20 border-[#3B82F6] text-white"
+                  : "bg-[#18181F] hover:bg-[#22222C] border-[#282834] text-zinc-400"
+              }`}
+            >
+              {showBrandHeader ? (
+                <Eye className="w-3.5 h-3.5 text-[#60A5FA]" />
+              ) : (
+                <EyeOff className="w-3.5 h-3.5" />
+              )}
+              Brand / URL
+            </button>
+            <button
+              type="button"
+              disabled={exportState.active}
+              onClick={togglePhoneFormat}
+              title="Convert current template to vertical Phone Format (9:16 iPhone)"
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium border cursor-pointer whitespace-nowrap transition-colors ${
+                phoneFormatMode
+                  ? "bg-[#2563EB]/20 border-[#3B82F6] text-white"
+                  : "bg-[#18181F] hover:bg-[#22222C] border-[#282834] text-zinc-200"
+              }`}
+            >
+              <Smartphone className="w-3.5 h-3.5 text-[#60A5FA]" />
+              Phone Format
+            </button>
             <button
               type="button"
               onClick={() => multiUploadRef.current?.click()}
@@ -813,6 +878,30 @@ export const ShortFilmStudioView: React.FC<ShortFilmStudioViewProps> = ({
               {audioEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
               Beat SFX
             </button>
+            <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-[#18181F] border border-[#282834] shrink-0">
+              <span className="text-[10px] text-zinc-400">SS</span>
+              <button
+                type="button"
+                disabled={exportState.active}
+                onClick={() => setMockupScale((s) => Math.max(55, s - 5))}
+                className="px-1 text-xs font-semibold text-zinc-300 hover:text-white cursor-pointer"
+                title="Decrease screenshot size"
+              >
+                −
+              </button>
+              <span className="text-[10px] font-mono-tabular text-zinc-200 w-8 text-center">
+                {mockupScale}%
+              </span>
+              <button
+                type="button"
+                disabled={exportState.active}
+                onClick={() => setMockupScale((s) => Math.min(140, s + 5))}
+                className="px-1 text-xs font-semibold text-zinc-300 hover:text-white cursor-pointer"
+                title="Increase screenshot size"
+              >
+                +
+              </button>
+            </div>
             <input
               type="range"
               min={0}
@@ -1153,13 +1242,18 @@ export const ShortFilmStudioView: React.FC<ShortFilmStudioViewProps> = ({
                     </button>
                   ))}
                 </div>
-                <div className="grid grid-cols-4 gap-1">
+                <div className="grid grid-cols-4 gap-1 mb-3">
                   {(Object.keys(FILM_ASPECTS) as FilmAspect[]).map((id) => (
                     <button
                       key={id}
                       type="button"
                       disabled={exportState.active}
-                      onClick={() => setAspectId(id)}
+                      onClick={() => {
+                        setAspectId(id);
+                        if (id !== "9:16" && phoneFormatMode) {
+                          setPhoneFormatMode(false);
+                        }
+                      }}
                       className={`py-1.5 rounded text-[11px] font-mono-tabular border cursor-pointer ${
                         aspectId === id
                           ? "bg-[#2563EB]/15 border-[#3B82F6]/60 text-white"
@@ -1169,6 +1263,33 @@ export const ShortFilmStudioView: React.FC<ShortFilmStudioViewProps> = ({
                       {id}
                     </button>
                   ))}
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between text-[11px] text-zinc-400 mb-1">
+                    <span>Screenshot Size (SS)</span>
+                    <div className="flex items-center gap-2">
+                      {mockupScale !== 100 && (
+                        <button
+                          type="button"
+                          onClick={() => setMockupScale(100)}
+                          className="text-[10px] text-[#60A5FA] hover:text-white cursor-pointer"
+                        >
+                          Reset
+                        </button>
+                      )}
+                      <span className="font-mono-tabular text-zinc-200">{mockupScale}%</span>
+                    </div>
+                  </div>
+                  <input
+                    type="range"
+                    min={55}
+                    max={140}
+                    value={mockupScale}
+                    disabled={exportState.active}
+                    onChange={(e) => setMockupScale(Number(e.target.value))}
+                    className="studio-slider w-full"
+                  />
                 </div>
               </div>
 
@@ -1292,6 +1413,7 @@ export const ShortFilmStudioView: React.FC<ShortFilmStudioViewProps> = ({
               <div className="space-y-1.5">
                 <h3 className="text-xs font-semibold text-zinc-200 mb-1">Cinema FX</h3>
                 {[
+                  { label: "Brand & URL Headings", val: showBrandHeader, set: setShowBrandHeader },
                   { label: "6-Act Commercial Story", val: commercialArc, set: setCommercialArc },
                   { label: "Cursor Click Zooms", val: cursorSpotlight, set: setCursorSpotlight },
                   { label: "Ambient Sparks", val: particlesEnabled, set: setParticlesEnabled },

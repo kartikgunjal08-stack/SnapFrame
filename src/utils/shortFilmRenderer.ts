@@ -8,6 +8,7 @@ import {
   ShortFilmPreset,
   ShortFilmShot,
 } from "../types/studio";
+import { sanitizeHexColor } from "./brandKitStorage";
 
 export interface FilmLookOption {
   id: FilmLookId;
@@ -133,10 +134,14 @@ function drawFilmBackdrop(
   globalProgress: number,
   particlesEnabled: boolean
 ) {
+  const safeC1 = sanitizeHexColor(c1, "#2563EB");
+  const safeC2 = sanitizeHexColor(c2, "#0F172A");
+  const safeC3 = sanitizeHexColor(c3, "#05070D");
+
   const grad = ctx.createLinearGradient(0, 0, w, h);
-  grad.addColorStop(0, c3);
-  grad.addColorStop(0.55, c2);
-  grad.addColorStop(1, c3);
+  grad.addColorStop(0, safeC3);
+  grad.addColorStop(0.55, safeC2);
+  grad.addColorStop(1, safeC3);
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, w, h);
 
@@ -144,7 +149,7 @@ function drawFilmBackdrop(
   const lx = w * (0.25 + 0.5 * Math.sin(globalProgress * Math.PI * 3));
   const ly = h * (0.22 + 0.3 * Math.cos(globalProgress * Math.PI * 2));
   const glow = ctx.createRadialGradient(lx, ly, 12, lx, ly, Math.max(w, h) * 0.62);
-  glow.addColorStop(0, c1);
+  glow.addColorStop(0, safeC1);
   glow.addColorStop(1, "rgba(0,0,0,0)");
   ctx.save();
   ctx.globalAlpha = 0.45;
@@ -155,7 +160,7 @@ function drawFilmBackdrop(
   const rx = w * (0.75 - 0.4 * Math.cos(globalProgress * Math.PI * 2));
   const ry = h * (0.78 - 0.25 * Math.sin(globalProgress * Math.PI * 3));
   const glow2 = ctx.createRadialGradient(rx, ry, 10, rx, ry, Math.max(w, h) * 0.45);
-  glow2.addColorStop(0, c1);
+  glow2.addColorStop(0, safeC1);
   glow2.addColorStop(1, "rgba(0,0,0,0)");
   ctx.save();
   ctx.globalAlpha = 0.24;
@@ -237,7 +242,8 @@ function drawShotCard(
   accent: string,
   shimmerProgress: number,
   chromaticOffset = 0,
-  cssFilter = "none"
+  cssFilter = "none",
+  showBrandHeader = true
 ) {
   if (Math.abs(chromaticOffset) > 0.5) {
     ctx.save();
@@ -279,37 +285,42 @@ function drawShotCard(
 
   const radius = frameStyle === "iphone" ? 34 : 14;
   const chromeH =
-    frameStyle === "macos-dark" || frameStyle === "macos-light" || frameStyle === "browser" ? 30 : 0;
+    showBrandHeader &&
+    (frameStyle === "macos-dark" || frameStyle === "macos-light" || frameStyle === "browser")
+      ? 30
+      : 0;
 
   ctx.save();
   roundRect(ctx, x, y, w, h, radius);
   ctx.clip();
 
-  if (frameStyle === "macos-dark" || frameStyle === "macos-light") {
-    const isLight = frameStyle === "macos-light";
-    ctx.fillStyle = isLight ? "#F4F4F6" : "#1B1C22";
-    ctx.fillRect(x, y, w, chromeH);
-    ["#FF5F56", "#FFBD2E", "#27C93F"].forEach((dot, i) => {
-      ctx.fillStyle = dot;
-      ctx.beginPath();
-      ctx.arc(x + 16 + i * 14, y + chromeH / 2, 4.2, 0, Math.PI * 2);
+  if (showBrandHeader) {
+    if (frameStyle === "macos-dark" || frameStyle === "macos-light") {
+      const isLight = frameStyle === "macos-light";
+      ctx.fillStyle = isLight ? "#F4F4F6" : "#1B1C22";
+      ctx.fillRect(x, y, w, chromeH);
+      ["#FF5F56", "#FFBD2E", "#27C93F"].forEach((dot, i) => {
+        ctx.fillStyle = dot;
+        ctx.beginPath();
+        ctx.arc(x + 16 + i * 14, y + chromeH / 2, 4.2, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      ctx.fillStyle = isLight ? "#52525B" : "#94A3B8";
+      ctx.font = "600 10.5px 'DM Sans', sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(titleLabel, x + w / 2, y + 19);
+    } else if (frameStyle === "browser") {
+      ctx.fillStyle = "#16171C";
+      ctx.fillRect(x, y, w, chromeH);
+      const barW = Math.min(240, w * 0.45);
+      roundRect(ctx, x + (w - barW) / 2, y + 5, barW, 20, 5);
+      ctx.fillStyle = "rgba(255,255,255,0.06)";
       ctx.fill();
-    });
-    ctx.fillStyle = isLight ? "#52525B" : "#94A3B8";
-    ctx.font = "600 10.5px 'DM Sans', sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText(titleLabel, x + w / 2, y + 19);
-  } else if (frameStyle === "browser") {
-    ctx.fillStyle = "#16171C";
-    ctx.fillRect(x, y, w, chromeH);
-    const barW = Math.min(240, w * 0.45);
-    roundRect(ctx, x + (w - barW) / 2, y + 5, barW, 20, 5);
-    ctx.fillStyle = "rgba(255,255,255,0.06)";
-    ctx.fill();
-    ctx.fillStyle = "#CBD5E1";
-    ctx.font = "500 10px 'JetBrains Mono', monospace";
-    ctx.textAlign = "center";
-    ctx.fillText(domainLabel, x + w / 2, y + 18);
+      ctx.fillStyle = "#CBD5E1";
+      ctx.font = "500 10px 'JetBrains Mono', monospace";
+      ctx.textAlign = "center";
+      ctx.fillText(domainLabel, x + w / 2, y + 18);
+    }
   }
 
   const contentY = y + chromeH;
@@ -431,7 +442,8 @@ function drawCinemaLetterboxAndChrome(
   accent: string,
   cinemaBars: boolean,
   chapterTag: string,
-  filmLook: FilmLookConfig
+  filmLook: FilmLookConfig,
+  showBrandHeader = true
 ) {
   // Optical Cinema Vignette
   if (filmLook.vignette > 0) {
@@ -472,13 +484,15 @@ function drawCinemaLetterboxAndChrome(
   }
 
   // Top-right crisp commercial chapter counter
-  const topOffset = cinemaBars ? (h > w ? 28 : 22) : 24;
-  ctx.save();
-  ctx.textAlign = "right";
-  ctx.fillStyle = "rgba(255,255,255,0.6)";
-  ctx.font = "600 10.5px 'JetBrains Mono', monospace";
-  ctx.fillText(chapterTag, w - 24, topOffset);
-  ctx.restore();
+  if (showBrandHeader) {
+    const topOffset = cinemaBars ? (h > w ? 28 : 22) : 24;
+    ctx.save();
+    ctx.textAlign = "right";
+    ctx.fillStyle = "rgba(255,255,255,0.6)";
+    ctx.font = "600 10.5px 'JetBrains Mono', monospace";
+    ctx.fillText(chapterTag, w - 24, topOffset);
+    ctx.restore();
+  }
 
   // Top edge progress hairline
   ctx.fillStyle = "rgba(255,255,255,0.1)";
@@ -500,6 +514,8 @@ export interface RenderShortFilmParams {
   filmLook: FilmLookConfig;
   brandKit: BrandKit;
   useBrandKit: boolean;
+  mockupScale?: number;
+  showBrandHeader?: boolean;
 }
 
 export function renderShortFilmFrame({
@@ -515,11 +531,19 @@ export function renderShortFilmFrame({
   filmLook,
   brandKit,
   useBrandKit,
+  mockupScale = 100,
+  showBrandHeader = true,
 }: RenderShortFilmParams) {
   const cssFilter = buildFilmLookCssFilter(filmLook);
   const safeShots = shots.length > 0 ? shots : [];
-  const accent = useBrandKit ? brandKit.primaryColor : preset.palette[0];
-  const secondary = useBrandKit ? brandKit.secondaryAccent : preset.palette[0];
+  const accent = sanitizeHexColor(
+    useBrandKit ? brandKit.primaryColor : preset.palette[0],
+    preset.palette[0]
+  );
+  const secondary = sanitizeHexColor(
+    useBrandKit ? brandKit.secondaryAccent : preset.palette[0],
+    preset.palette[0]
+  );
   const brandTitle =
     dealScript.clientName.trim() ||
     (useBrandKit && brandKit.brandName ? brandKit.brandName : "SnapFramy");
@@ -541,8 +565,29 @@ export function renderShortFilmFrame({
 
   const isVert = height > width;
   const isPhone = preset.frameStyle === "iphone";
-  const baseW = isPhone ? Math.min(280, width * 0.42) : Math.min(780, width * 0.74);
-  const baseH = isPhone ? Math.min(540, height * 0.64) : Math.min(460, height * 0.62);
+  const userScale = Math.max(0.45, Math.min(1.45, mockupScale / 100));
+
+  let rawW: number;
+  let rawH: number;
+  if (isPhone) {
+    if (isVert) {
+      rawH = Math.min(680, height * 0.62);
+      rawW = rawH * 0.505;
+      if (rawW > width * 0.68) {
+        rawW = width * 0.68;
+        rawH = rawW / 0.505;
+      }
+    } else {
+      rawH = Math.min(540, height * 0.72);
+      rawW = rawH * 0.505;
+    }
+  } else {
+    rawW = isVert ? Math.min(620, width * 0.86) : Math.min(780, width * 0.74);
+    rawH = isVert ? Math.min(390, height * 0.36) : Math.min(460, height * 0.62);
+  }
+
+  const baseW = rawW * userScale;
+  const baseH = rawH * userScale;
 
   const drawShotTransform = (
     shot: ShortFilmShot,
@@ -587,7 +632,8 @@ export function renderShortFilmFrame({
       accent,
       shimmerT,
       chromaAmt,
-      cssFilter
+      cssFilter,
+      showBrandHeader
     );
     ctx.restore();
   };
@@ -620,9 +666,11 @@ export function renderShortFilmFrame({
       ctx.scale(1.28 - 0.28 * slam, 1.28 - 0.28 * slam);
       ctx.textAlign = "center";
 
-      ctx.fillStyle = secondary;
-      ctx.font = `700 ${isVert ? 13 : 14}px 'JetBrains Mono', monospace`;
-      ctx.fillText(`SPOTLIGHT PARTNER · ${brandTitle.toUpperCase()}`, 0, -48);
+      if (showBrandHeader) {
+        ctx.fillStyle = secondary;
+        ctx.font = `700 ${isVert ? 13 : 14}px 'JetBrains Mono', monospace`;
+        ctx.fillText(`SPOTLIGHT PARTNER · ${brandTitle.toUpperCase()}`, 0, -48);
+      }
 
       const words = (dealScript.problemHook || "Stop wasting hours on static visuals.").split(" ");
       const visibleWords = words.slice(0, Math.max(1, Math.ceil(words.length * Math.min(1, chP * 1.65))));
@@ -635,7 +683,7 @@ export function renderShortFilmFrame({
       ctx.fill();
       ctx.restore();
 
-      drawCinemaLetterboxAndChrome(ctx, width, height, progress, accent, preset.cinemaBars, "ACT 01 · HOOK", filmLook);
+      drawCinemaLetterboxAndChrome(ctx, width, height, progress, accent, preset.cinemaBars, "ACT 01 · HOOK", filmLook, showBrandHeader);
       return;
     }
 
@@ -693,7 +741,7 @@ export function renderShortFilmFrame({
         );
       }
 
-      drawCinemaLetterboxAndChrome(ctx, width, height, progress, accent, preset.cinemaBars, "ACT 02 · REVEAL", filmLook);
+      drawCinemaLetterboxAndChrome(ctx, width, height, progress, accent, preset.cinemaBars, "ACT 02 · REVEAL", filmLook, showBrandHeader);
       return;
     }
 
@@ -875,7 +923,8 @@ export function renderShortFilmFrame({
         accent,
         preset.cinemaBars,
         `ACT 03 · SCENE 0${activeIdx + 1}`,
-        filmLook
+        filmLook,
+        showBrandHeader
       );
       return;
     }
@@ -885,12 +934,24 @@ export function renderShortFilmFrame({
       const chP = (progress - 0.57) / 0.15;
       const bentoP = easeOutExpo(clamp01(chP / 0.45));
       const n = safeShots.length;
-      const cols = n <= 2 ? n : n <= 4 ? 2 : 3;
+      const cols = isVert ? (n <= 1 ? 1 : 2) : n <= 2 ? n : n <= 4 ? 2 : 3;
       const rows = Math.ceil(n / cols);
-      const cellW = Math.min(340, (width * 0.82) / cols - 18);
-      const cellH = Math.min(230, (height * 0.62) / rows - 18);
-      const startX = (width - (cols * cellW + (cols - 1) * 18)) / 2;
-      const startY = (height - (rows * cellH + (rows - 1) * 18)) / 2 + 18;
+      const gridScale = Math.max(0.65, Math.min(1.18, userScale));
+      const maxSlotW = (width * 0.84) / cols - 16;
+      const maxSlotH = (height * (isVert ? 0.66 : 0.62)) / rows - 16;
+      let cellW = Math.min(isPhone ? 210 : 340, maxSlotW) * gridScale;
+      let cellH = Math.min(isPhone ? 380 : 230, maxSlotH) * gridScale;
+      if (isPhone) {
+        const fittedH = Math.min(maxSlotH, cellW / 0.52);
+        const fittedW = fittedH * 0.52;
+        cellW = Math.min(maxSlotW, fittedW);
+        cellH = cellW / 0.52;
+      } else {
+        cellW = Math.min(maxSlotW, cellW);
+        cellH = Math.min(maxSlotH, cellH);
+      }
+      const startX = (width - (cols * cellW + (cols - 1) * 16)) / 2;
+      const startY = (height - (rows * cellH + (rows - 1) * 16)) / 2 + 18;
 
       const camZoom = 0.96 + chP * 0.08;
       ctx.save();
@@ -920,7 +981,8 @@ export function renderShortFilmFrame({
           accent,
           chP,
           0,
-          cssFilter
+          cssFilter,
+          showBrandHeader
         );
         ctx.restore();
       });
@@ -938,7 +1000,7 @@ export function renderShortFilmFrame({
       );
       ctx.restore();
 
-      drawCinemaLetterboxAndChrome(ctx, width, height, progress, accent, preset.cinemaBars, "ACT 04 · SUITE", filmLook);
+      drawCinemaLetterboxAndChrome(ctx, width, height, progress, accent, preset.cinemaBars, "ACT 04 · SUITE", filmLook, showBrandHeader);
       return;
     }
 
@@ -974,12 +1036,14 @@ export function renderShortFilmFrame({
         dealScript.proofStat3 || "Zero Setup Friction",
       ];
 
-      ctx.save();
-      ctx.textAlign = "center";
-      ctx.fillStyle = secondary;
-      ctx.font = "700 13px 'JetBrains Mono', monospace";
-      ctx.fillText(`WHY BRANDS CHOOSE ${brandTitle.toUpperCase()}`, width / 2, height * 0.25);
-      ctx.restore();
+      if (showBrandHeader) {
+        ctx.save();
+        ctx.textAlign = "center";
+        ctx.fillStyle = secondary;
+        ctx.font = "700 13px 'JetBrains Mono', monospace";
+        ctx.fillText(`WHY BRANDS CHOOSE ${brandTitle.toUpperCase()}`, width / 2, height * 0.25);
+        ctx.restore();
+      }
 
       const cardW = isVert ? width * 0.78 : Math.min(310, width * 0.27);
       const cardH = isVert ? 120 : 170;
@@ -1022,7 +1086,7 @@ export function renderShortFilmFrame({
         ctx.restore();
       });
 
-      drawCinemaLetterboxAndChrome(ctx, width, height, progress, accent, preset.cinemaBars, "ACT 05 · RESULTS", filmLook);
+      drawCinemaLetterboxAndChrome(ctx, width, height, progress, accent, preset.cinemaBars, "ACT 05 · RESULTS", filmLook, showBrandHeader);
       return;
     }
 
@@ -1072,7 +1136,7 @@ export function renderShortFilmFrame({
     ctx.fillText(domainLabel, 0, 124);
     ctx.restore();
 
-    drawCinemaLetterboxAndChrome(ctx, width, height, progress, accent, preset.cinemaBars, "ACT 06 · OFFER CTA", filmLook);
+    drawCinemaLetterboxAndChrome(ctx, width, height, progress, accent, preset.cinemaBars, "ACT 06 · OFFER CTA", filmLook, showBrandHeader);
     return;
   }
 
@@ -1087,9 +1151,11 @@ export function renderShortFilmFrame({
     ctx.translate(width / 2, height / 2);
     ctx.scale(slamScale, slamScale);
     ctx.textAlign = "center";
-    ctx.fillStyle = secondary;
-    ctx.font = `700 ${isVert ? 16 : 15}px 'JetBrains Mono', monospace`;
-    ctx.fillText(brandTitle.toUpperCase(), 0, -34);
+    if (showBrandHeader) {
+      ctx.fillStyle = secondary;
+      ctx.font = `700 ${isVert ? 16 : 15}px 'JetBrains Mono', monospace`;
+      ctx.fillText(brandTitle.toUpperCase(), 0, -34);
+    }
     ctx.fillStyle = "#FFFFFF";
     ctx.font = `800 ${isVert ? 42 : 54}px 'Plus Jakarta Sans', sans-serif`;
     ctx.fillText(dealScript.heroHeadline || "Built to move fast.", 0, 18, width - 88);
@@ -1154,7 +1220,7 @@ export function renderShortFilmFrame({
   }
   drawShotTransform(activeShot, activeImg, cx, cy, sc, rot, preset.tiltAngle * 0.002, preset.tiltAngle * 0.004 * dir, 1, chroma, localT);
 
-  drawCinemaLetterboxAndChrome(ctx, width, height, progress, accent, preset.cinemaBars, `SHOT 0${activeIdx + 1}`, filmLook);
+  drawCinemaLetterboxAndChrome(ctx, width, height, progress, accent, preset.cinemaBars, `SHOT 0${activeIdx + 1}`, filmLook, showBrandHeader);
 }
 
 /**

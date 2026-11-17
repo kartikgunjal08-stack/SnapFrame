@@ -3,6 +3,13 @@ import { BrandKit, StudioState } from "../types/studio";
 
 const STORAGE_KEY = "snapframy_brand_kit_v1";
 
+export function sanitizeHexColor(value: string | undefined | null, fallback: string): string {
+  const trimmed = (value || "").trim();
+  return /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$/.test(trimmed)
+    ? trimmed
+    : fallback;
+}
+
 export function getDefaultBrandKit(): BrandKit {
   return {
     ...APP_CONFIG.defaultBrandKit,
@@ -11,16 +18,19 @@ export function getDefaultBrandKit(): BrandKit {
 }
 
 export function loadBrandKit(): BrandKit {
+  const defaults = getDefaultBrandKit();
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return getDefaultBrandKit();
+    if (!raw) return defaults;
     const parsed = JSON.parse(raw) as Partial<BrandKit>;
     return {
-      ...getDefaultBrandKit(),
+      ...defaults,
       ...parsed,
+      primaryColor: sanitizeHexColor(parsed.primaryColor, defaults.primaryColor),
+      secondaryAccent: sanitizeHexColor(parsed.secondaryAccent, defaults.secondaryAccent),
     };
   } catch {
-    return getDefaultBrandKit();
+    return defaults;
   }
 }
 

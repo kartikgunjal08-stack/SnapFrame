@@ -10,6 +10,9 @@ import {
   Palette,
   Repeat,
   Square,
+  Smartphone,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { MOTION_CATEGORIES, MOTION_PRESETS } from "../data/motionPresets";
 import {
@@ -57,10 +60,13 @@ export const MotionStudioView: React.FC<MotionStudioViewProps> = ({
   const [searchQuery, setSearchQuery] = useState("");
   const [activePreset, setActivePreset] = useState<MotionPreset>(MOTION_PRESETS[0]);
   const [aspectId, setAspectId] = useState<MotionAspectId>("16:9");
+  const [phoneFormatMode, setPhoneFormatMode] = useState(false);
+  const [mockupScale, setMockupScale] = useState(100);
   const [duration, setDuration] = useState<MotionDuration>(MOTION_PRESETS[0].defaultDuration);
   const [easing, setEasing] = useState<MotionEasing>(MOTION_PRESETS[0].defaultEasing);
   const [loop, setLoop] = useState(true);
   const [showHeadline, setShowHeadline] = useState(true);
+  const [showFrameHeader, setShowFrameHeader] = useState(true);
   const [eyebrow, setEyebrow] = useState(MOTION_PRESETS[0].eyebrowDefault);
   const [headline, setHeadline] = useState(MOTION_PRESETS[0].headlineDefault);
   const [useBrandKit, setUseBrandKit] = useState(true);
@@ -114,6 +120,14 @@ export const MotionStudioView: React.FC<MotionStudioViewProps> = ({
 
   const dims = MOTION_ASPECT_DIMENSIONS[aspectId];
 
+  const effectivePreset: MotionPreset = useMemo(
+    () =>
+      phoneFormatMode
+        ? { ...activePreset, frameStyle: "iphone" }
+        : activePreset,
+    [activePreset, phoneFormatMode]
+  );
+
   const drawAtTime = useCallback(
     (tSec: number) => {
       const canvas = canvasRef.current;
@@ -127,7 +141,7 @@ export const MotionStudioView: React.FC<MotionStudioViewProps> = ({
         width: dims.width,
         height: dims.height,
         progress,
-        preset: activePreset,
+        preset: effectivePreset,
         easing,
         img: loadedImgRef.current,
         logoImg: loadedLogoRef.current,
@@ -136,17 +150,21 @@ export const MotionStudioView: React.FC<MotionStudioViewProps> = ({
         showHeadline,
         brandKit,
         useBrandKit,
+        mockupScale,
+        showFrameHeader,
       });
     },
     [
-      activePreset,
       brandKit,
       dims.height,
       dims.width,
       duration,
       easing,
+      effectivePreset,
       eyebrow,
       headline,
+      mockupScale,
+      showFrameHeader,
       showHeadline,
       useBrandKit,
     ]
@@ -193,9 +211,25 @@ export const MotionStudioView: React.FC<MotionStudioViewProps> = ({
     setEasing(preset.defaultEasing);
     setEyebrow(preset.eyebrowDefault);
     setHeadline(preset.headlineDefault);
+    if (preset.defaultAspect) {
+      setAspectId(preset.defaultAspect);
+      if (preset.defaultAspect === "9:16" && preset.frameStyle === "iphone") {
+        setPhoneFormatMode(true);
+      }
+    } else if (phoneFormatMode) {
+      setAspectId("9:16");
+    }
     currentTimeRef.current = 0;
     setCurrentTime(0);
     setIsPlaying(true);
+  };
+
+  const togglePhoneFormat = () => {
+    setPhoneFormatMode((prev) => {
+      const next = !prev;
+      setAspectId(next ? "9:16" : activePreset.defaultAspect || "16:9");
+      return next;
+    });
   };
 
   const handleVideoExport = async (kind: "webm" | "mp4") => {
@@ -318,7 +352,7 @@ export const MotionStudioView: React.FC<MotionStudioViewProps> = ({
         width: gw,
         height: gh,
         progress,
-        preset: activePreset,
+        preset: effectivePreset,
         easing,
         img: loadedImgRef.current,
         logoImg: loadedLogoRef.current,
@@ -327,6 +361,8 @@ export const MotionStudioView: React.FC<MotionStudioViewProps> = ({
         showHeadline,
         brandKit,
         useBrandKit,
+        mockupScale,
+        showFrameHeader,
       });
       frames.push(offCtx.getImageData(0, 0, gw, gh));
       setExportState({
@@ -456,7 +492,57 @@ export const MotionStudioView: React.FC<MotionStudioViewProps> = ({
             <span className="truncate hidden sm:inline">{imageName} (Ctrl+V supported)</span>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0 flex-wrap">
+            <button
+              type="button"
+              disabled={exportState.active}
+              onClick={() => setShowFrameHeader((v) => !v)}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs font-medium cursor-pointer whitespace-nowrap transition-colors ${
+                showFrameHeader
+                  ? "bg-[#2563EB]/20 border-[#3B82F6] text-white"
+                  : "bg-[#18181F] hover:bg-[#22222C] border-[#282834] text-zinc-400"
+              }`}
+              title="Show or hide Brand Name / URL in frame heading bar"
+            >
+              {showFrameHeader ? (
+                <Eye className="w-3.5 h-3.5 text-[#60A5FA]" />
+              ) : (
+                <EyeOff className="w-3.5 h-3.5" />
+              )}
+              Brand / URL
+            </button>
+            <button
+              type="button"
+              disabled={exportState.active}
+              onClick={() => setShowHeadline((v) => !v)}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs font-medium cursor-pointer whitespace-nowrap transition-colors ${
+                showHeadline
+                  ? "bg-[#2563EB]/20 border-[#3B82F6] text-white"
+                  : "bg-[#18181F] hover:bg-[#22222C] border-[#282834] text-zinc-400"
+              }`}
+              title="Show or hide top Eyebrow & Headline popup"
+            >
+              {showHeadline ? (
+                <Eye className="w-3.5 h-3.5 text-[#60A5FA]" />
+              ) : (
+                <EyeOff className="w-3.5 h-3.5" />
+              )}
+              Headline
+            </button>
+            <button
+              type="button"
+              disabled={exportState.active}
+              onClick={togglePhoneFormat}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs font-medium cursor-pointer whitespace-nowrap transition-colors ${
+                phoneFormatMode
+                  ? "bg-[#2563EB]/20 border-[#3B82F6] text-white"
+                  : "bg-[#18181F] hover:bg-[#22222C] border-[#282834] text-zinc-200"
+              }`}
+              title="Convert selected Motion template into vertical iPhone 9:16 format"
+            >
+              <Smartphone className="w-3.5 h-3.5 text-[#60A5FA]" />
+              Phone Format
+            </button>
             <input
               ref={fileInputRef}
               type="file"
@@ -594,6 +680,22 @@ export const MotionStudioView: React.FC<MotionStudioViewProps> = ({
           </div>
 
           <div>
+            <div className="flex items-center justify-between text-xs font-semibold text-zinc-200 mb-1.5">
+              <span>Screenshot Size (SS)</span>
+              <span className="font-mono-tabular text-[11px] text-[#60A5FA]">{mockupScale}%</span>
+            </div>
+            <input
+              type="range"
+              min={55}
+              max={140}
+              disabled={exportState.active}
+              value={mockupScale}
+              onChange={(e) => setMockupScale(Number(e.target.value))}
+              className="studio-slider"
+            />
+          </div>
+
+          <div>
             <h3 className="text-xs font-semibold text-zinc-200 mb-2">Aspect Ratio</h3>
             <div className="grid grid-cols-3 gap-1.5">
               {(Object.keys(MOTION_ASPECT_DIMENSIONS) as MotionAspectId[]).map((id) => (
@@ -644,6 +746,16 @@ export const MotionStudioView: React.FC<MotionStudioViewProps> = ({
                 type="checkbox"
                 checked={useBrandKit}
                 onChange={(e) => setUseBrandKit(e.target.checked)}
+                className="accent-[#2563EB] cursor-pointer"
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-zinc-200">Show Brand / URL Bar</span>
+              <input
+                type="checkbox"
+                checked={showFrameHeader}
+                onChange={(e) => setShowFrameHeader(e.target.checked)}
                 className="accent-[#2563EB] cursor-pointer"
               />
             </div>

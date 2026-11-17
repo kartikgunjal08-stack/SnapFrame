@@ -2,7 +2,7 @@ import React, { useRef } from "react";
 import { X, Upload, RotateCcw, Check, Undo2, Redo2 } from "lucide-react";
 import { FontMood } from "../config";
 import { BrandKit } from "../types/studio";
-import { getDefaultBrandKit } from "../utils/brandKitStorage";
+import { getDefaultBrandKit, sanitizeHexColor } from "../utils/brandKitStorage";
 
 interface BrandKitPanelProps {
   open: boolean;
@@ -139,7 +139,13 @@ export const BrandKitPanel: React.FC<BrandKitPanelProps> = ({
               <div className="flex items-center gap-2">
                 <input
                   type="color"
-                  value={brandKit.primaryColor}
+                  value={
+                    /^#[0-9A-Fa-f]{6}$/.test(brandKit.primaryColor.trim())
+                      ? brandKit.primaryColor.trim()
+                      : sanitizeHexColor(brandKit.primaryColor, "#2563EB").length === 7
+                      ? sanitizeHexColor(brandKit.primaryColor, "#2563EB")
+                      : "#2563EB"
+                  }
                   onChange={(e) => onChange({ ...brandKit, primaryColor: e.target.value })}
                   className="w-8 h-8 rounded border border-white/20 bg-transparent cursor-pointer"
                 />
@@ -157,7 +163,13 @@ export const BrandKitPanel: React.FC<BrandKitPanelProps> = ({
               <div className="flex items-center gap-2">
                 <input
                   type="color"
-                  value={brandKit.secondaryAccent}
+                  value={
+                    /^#[0-9A-Fa-f]{6}$/.test(brandKit.secondaryAccent.trim())
+                      ? brandKit.secondaryAccent.trim()
+                      : sanitizeHexColor(brandKit.secondaryAccent, "#60A5FA").length === 7
+                      ? sanitizeHexColor(brandKit.secondaryAccent, "#60A5FA")
+                      : "#60A5FA"
+                  }
                   onChange={(e) => onChange({ ...brandKit, secondaryAccent: e.target.value })}
                   className="w-8 h-8 rounded border border-white/20 bg-transparent cursor-pointer"
                 />
