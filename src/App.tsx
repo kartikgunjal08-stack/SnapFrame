@@ -82,8 +82,11 @@ export default function App() {
     loading: authLoading,
     authBusy,
     isSupabaseConfigured,
+    hasActiveAccess,
+    hasExpiredPlan,
     signIn,
     signUp,
+    redeemCode,
     signOut,
   } = useAuth();
 
@@ -96,7 +99,7 @@ export default function App() {
   const [activeView, setActiveView] = useState<AppView>("studio");
   const [brandKitOpen, setBrandKitOpen] = useState(false);
   const [studioCropOpen, setStudioCropOpen] = useState(false);
-  const isPreviewLocked = !user;
+  const isPreviewLocked = !hasActiveAccess;
 
   const {
     present,
@@ -132,21 +135,23 @@ export default function App() {
   const exportRef = useRef<HTMLDivElement | null>(null);
   const deviceRef = useRef<HTMLDivElement | null>(null);
 
-  // Keep Brand Kit persisted in localStorage (and Supabase when signed in)
+  // Keep Brand Kit persisted in localStorage (and Supabase when user has active pass)
   useEffect(() => {
     saveBrandKit(brandKit);
-    if (!user) return;
+    if (!user || !hasActiveAccess) return;
     const timer = window.setTimeout(() => {
       void upsertCloudBrandKit(user.id, brandKit);
     }, 650);
     return () => window.clearTimeout(timer);
-  }, [brandKit, user]);
+  }, [brandKit, hasActiveAccess, user]);
 
-  // Hydrate cloud Brand Kit and close Preview/Auth modal once signed in
+  // Hydrate cloud Brand Kit and close Preview/Auth modal once user has an active redeemed pass
   const hydratedUserRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!user) {
-      hydratedUserRef.current = null;
+    if (!user || !hasActiveAccess) {
+      if (!user) {
+        hydratedUserRef.current = null;
+      }
       return;
     }
     setIsPreviewMode(false);
@@ -166,7 +171,7 @@ export default function App() {
         { record: false }
       );
     });
-  }, [commit, user]);
+  }, [commit, hasActiveAccess, user]);
 
   const showNotice = useCallback((text: string, type: "info" | "error" = "info") => {
     setNotice({ text, type });
@@ -736,13 +741,21 @@ export default function App() {
     );
   }
 
-  if (!user && !isPreviewMode) {
+  if (!hasActiveAccess && !isPreviewMode) {
     return (
       <AuthPage
         authBusy={authBusy}
         isSupabaseConfigured={isSupabaseConfigured}
+        needsActivation={Boolean(user && !hasActiveAccess)}
+        hasExpiredPlan={hasExpiredPlan}
+        userEmail={user?.email ?? null}
         onSignIn={signIn}
         onSignUp={signUp}
+        onRedeemCode={redeemCode}
+        onSignOut={async () => {
+          await signOut();
+          setIsPreviewMode(false);
+        }}
         onWatchInPreviewMode={() => {
           setIsPreviewMode(true);
           setActiveView("studio");
@@ -816,7 +829,7 @@ export default function App() {
             </button>
           </div>
 
-          {user ? (
+          {user && hasActiveAccess ? (
             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#141419] border border-[#24242E]">
               <UserCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
               <span className="text-[11px] font-medium text-zinc-200 max-w-[85px] sm:max-w-[130px] truncate">
@@ -853,13 +866,17 @@ export default function App() {
             <button
               type="button"
               onClick={() =>
-                openAuthModal("Sign in or log in to upload your own screenshots.")
+                openAuthModal(
+                  user
+                    ? "Enter a valid 1 Month redeem code to unlock custom screenshot uploads."
+                    : "Sign in or redeem a 1 Month code to upload your own screenshots."
+                )
               }
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#161E31] hover:bg-[#1E2A45] border border-[#2C3E6B] text-xs font-semibold text-blue-100 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
             >
               <Eye className="w-3.5 h-3.5 text-[#60A5FA] sm:hidden" />
               <Lock className="w-3.5 h-3.5 text-[#60A5FA] hidden sm:inline" />
-              Sign In
+              {user ? "Redeem Code" : "Sign In"}
             </button>
           )}
 
@@ -885,7 +902,7 @@ export default function App() {
       </header>
 
       {/* Interactive SaaS Tour Strip when in Preview Mode */}
-      {isPreviewMode && !user && (
+      {isPreviewMode && !hasActiveAccess && (
         <PreviewTourBar
           activeView={activeView}
           onSelectView={setActiveView}
@@ -1072,14 +1089,22 @@ export default function App() {
         onClose={() => setStudioCropOpen(false)}
       />
 
-      {/* Sign In / Login Modal (Triggered from Preview Mode or locked screenshot upload) */}
+      {/* Sign In / Login / Redeem Code Modal */}
       <AuthModal
         open={authModal.open}
         reason={authModal.reason}
         authBusy={authBusy}
         isSupabaseConfigured={isSupabaseConfigured}
+        needsActivation={Boolean(user && !hasActiveAccess)}
+        hasExpiredPlan={hasExpiredPlan}
+        userEmail={user?.email ?? null}
         onSignIn={signIn}
         onSignUp={signUp}
+        onRedeemCode={redeemCode}
+        onSignOut={async () => {
+          await signOut();
+          setIsPreviewMode(false);
+        }}
         onClose={() => setAuthModal({ open: false, reason: null })}
       />
 

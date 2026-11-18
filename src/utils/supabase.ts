@@ -65,6 +65,21 @@ export function formatPlanLabel(plan?: string | null): string {
   return clean;
 }
 
+export function isProfileSubscriptionActive(profile: UserProfile | null | undefined): boolean {
+  if (!profile || !profile.is_redeemed) return false;
+  if (!profile.plan_expires_at) return true;
+  const expiresMs = Date.parse(profile.plan_expires_at);
+  if (Number.isNaN(expiresMs)) return false;
+  return expiresMs > Date.now();
+}
+
+export function isProfileSubscriptionExpired(profile: UserProfile | null | undefined): boolean {
+  if (!profile || !profile.is_redeemed || !profile.plan_expires_at) return false;
+  const expiresMs = Date.parse(profile.plan_expires_at);
+  if (Number.isNaN(expiresMs)) return false;
+  return expiresMs <= Date.now();
+}
+
 export interface RedeemPrecheckResult {
   allowed: boolean;
   already_redeemed: boolean;
@@ -80,3 +95,4 @@ export interface ClaimRedeemResult {
   plan_expires_at?: string;
   reason?: string;
 }
+

@@ -3,6 +3,8 @@ import type { Session, User } from "@supabase/supabase-js";
 import {
   ClaimRedeemResult,
   formatPlanLabel,
+  isProfileSubscriptionActive,
+  isProfileSubscriptionExpired,
   isSupabaseConfigured,
   RedeemPrecheckResult,
   supabase,
@@ -15,6 +17,7 @@ export interface AuthActionResult {
   ok: boolean;
   message?: string;
   needsEmailConfirmation?: boolean;
+  hasActiveAccess?: boolean;
 }
 
 export function useAuth() {
@@ -34,7 +37,10 @@ export function useAuth() {
       .eq("id", userId)
       .maybeSingle();
 
-    if (error || !data) return null;
+    if (error || !data) {
+      setProfile(null);
+      return null;
+    }
     const typed = data as UserProfile;
     setProfile(typed);
     return typed;
@@ -127,11 +133,22 @@ export function useAuth() {
         if (error) {
           return { ok: false, message: error.message };
         }
+        let loaded: UserProfile | null = null;
         if (data.user) {
           await claimPendingCodeIfNeeded(data.user.id);
-          await loadProfile(data.user.id);
+          loaded = await loadProfile(data.user.id);
         }
-        return { ok: true };
+        const active = isProfileSubscriptionActive(loaded);
+        if (!active) {
+          return {
+            ok: true,
+            hasActiveAccess: false,
+            message: isProfileSubscriptionExpired(loaded)
+              ? "Your 1 Month subscription has expired. Paste a renewal redeem code below to continue."
+              : "This account does not have an active 1 Month redeem code yet. Paste your redeem code below to enter.",
+          };
+        }
+        return { ok: true, hasActiveAccess: true };
       } catch (err) {
         return {
           ok: false,
@@ -168,29 +185,33 @@ export function useAuth() {
       if (password.length < 6) {
         return { ok: false, message: "Password must be at least 6 characters." };
       }
+      if (!cleanCode) {
+        return {
+          ok: false,
+          message: "A valid 1 Month subscription redeem code is required to create an account.",
+        };
+      }
 
       setAuthBusy(true);
       try {
-        // Optional purchased redeem code precheck if code was entered
-        if (cleanCode) {
-          const { data: precheck, error: precheckErr } = await supabase.rpc(
-            "precheck_redeem_access",
-            {
-              p_email: cleanEmail,
-              p_code: cleanCode,
-            }
-          );
+        // Mandatory redeem code precheck before creating auth user
+        const { data: precheck, error: precheckErr } = await supabase.rpc(
+          "precheck_redeem_access",
+          {
+            p_email: cleanEmail,
+            p_code: cleanCode,
+          }
+        );
 
-          if (precheckErr) {
-            return { ok: false, message: precheckErr.message };
-          }
-          const parsed = precheck as RedeemPrecheckResult | null;
-          if (parsed && !parsed.allowed) {
-            return {
-              ok: false,
-              message: parsed.reason || "Invalid or already used redeem code.",
-            };
-          }
+        if (precheckErr) {
+          return { ok: false, message: precheckErr.message };
+        }
+        const parsed = precheck as RedeemPrecheckResult | null;
+        if (!parsed || !parsed.allowed) {
+          return {
+            ok: false,
+            message: parsed?.reason || "Invalid or already used 1 Month redeem code.",
+          };
         }
 
         const { data, error } = await supabase.auth.signUp({
@@ -209,36 +230,33 @@ export function useAuth() {
           return { ok: false, message: error.message };
         }
 
-        if (cleanCode) {
-          if (data.session && data.user) {
-            const { data: claimData } = await supabase.rpc("claim_redeem_code", {
-              p_code: cleanCode,
-            });
-            const claimRes = claimData as ClaimRedeemResult | null;
-            if (claimRes && !claimRes.success) {
-              return {
-                ok: true,
-                message:
-                  claimRes.reason ||
-                  "Account created, but code could not be claimed. You can redeem it in Account settings.",
-              };
-            }
-            await loadProfile(data.user.id);
-          } else {
-            localStorage.setItem(PENDING_REDEEM_STORAGE_KEY, cleanCode);
+        if (data.session && data.user) {
+          const { data: claimData, error: claimErr } = await supabase.rpc("claim_redeem_code", {
+            p_code: cleanCode,
+          });
+          const claimRes = claimData as ClaimRedeemResult | null;
+          if (claimErr || !claimRes?.success) {
+            return {
+              ok: false,
+              hasActiveAccess: false,
+              message:
+                claimErr?.message ||
+                claimRes?.reason ||
+                "Account created, but your redeem code could not be claimed. Please enter a valid 1 Month code below.",
+            };
           }
+          const loaded = await loadProfile(data.user.id);
+          return { ok: true, hasActiveAccess: isProfileSubscriptionActive(loaded) };
         }
 
-        if (!data.session) {
-          return {
-            ok: true,
-            needsEmailConfirmation: true,
-            message:
-              "Account created! Check your inbox to confirm your email, then sign in.",
-          };
-        }
-
-        return { ok: true };
+        localStorage.setItem(PENDING_REDEEM_STORAGE_KEY, cleanCode);
+        return {
+          ok: true,
+          needsEmailConfirmation: true,
+          hasActiveAccess: false,
+          message:
+            "Account created! Check your inbox to confirm your email, then sign in.",
+        };
       } catch (err) {
         return {
           ok: false,
@@ -258,7 +276,7 @@ export function useAuth() {
       }
       const cleanCode = code.trim().toUpperCase();
       if (!cleanCode) {
-        return { ok: false, message: "Enter a redeem code first." };
+        return { ok: false, message: "Please paste your 1 Month redeem code first." };
       }
 
       setAuthBusy(true);
@@ -271,11 +289,12 @@ export function useAuth() {
         }
         const res = data as ClaimRedeemResult | null;
         if (!res?.success) {
-          return { ok: false, message: res?.reason || "Redeem failed." };
+          return { ok: false, message: res?.reason || "Invalid or already used redeem code." };
         }
-        await loadProfile(user.id);
+        const loaded = await loadProfile(user.id);
         return {
           ok: true,
+          hasActiveAccess: isProfileSubscriptionActive(loaded),
           message: `Activated ${formatPlanLabel(res.tier || "1 Month")} subscription (${res.code || cleanCode})!`,
         };
       } finally {
@@ -293,6 +312,13 @@ export function useAuth() {
     setProfile(null);
   }, []);
 
+  const hasActiveAccess = Boolean(
+    user && profile && profile.id === user.id && isProfileSubscriptionActive(profile)
+  );
+  const hasExpiredPlan = Boolean(
+    user && profile && profile.id === user.id && isProfileSubscriptionExpired(profile)
+  );
+
   return {
     session,
     user,
@@ -300,6 +326,8 @@ export function useAuth() {
     loading,
     authBusy,
     isSupabaseConfigured,
+    hasActiveAccess,
+    hasExpiredPlan,
     signIn,
     signUp,
     redeemCode,
