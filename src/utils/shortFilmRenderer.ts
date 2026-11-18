@@ -738,7 +738,7 @@ export function renderShortFilmFrame({
         ? 30
         : 0;
     const maxW = isVert ? Math.min(640, width * 0.88) : Math.min(800, width * 0.76);
-    const maxH = isVert ? Math.min(540, height * 0.54) : Math.min(480, height * 0.64);
+    const maxH = isVert ? Math.min(760, height * 0.66) : Math.min(480, height * 0.64);
     const targetBoxRatio = maxW / Math.max(1, maxH - chromeReserve);
     if (primaryRatio > targetBoxRatio) {
       rawW = maxW;

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Upload, RotateCcw, ZoomIn, ZoomOut, Lock, ShieldCheck, Maximize2, Minimize2, Crop, Play, Sparkles } from "lucide-react";
+import { Upload, RotateCcw, ZoomIn, ZoomOut, Lock, ShieldCheck, Maximize2, Minimize2, Crop, Play, Sparkles, X } from "lucide-react";
 import { APP_CONFIG } from "../config";
 import { ASPECT_RATIO_OPTIONS, BACKGROUND_PRESETS } from "../data/presets";
 import {
@@ -63,6 +63,7 @@ export const MockupCanvas: React.FC<MockupCanvasProps> = ({
   const [imgAspect, setImgAspect] = useState<number>(1.6);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [animReplayKey, setAnimReplayKey] = useState(0);
+  const [showQuickTips, setShowQuickTips] = useState(true);
 
   const activeAnim: StudioCssAnimation = state.cssAnimation ?? "tilt-orbit";
   const animClass =
@@ -556,6 +557,27 @@ export const MockupCanvas: React.FC<MockupCanvasProps> = ({
           )}
         </div>
       </div>
+
+      {!isFullscreen && showQuickTips && (
+        <div className="flex items-center justify-between gap-3 px-4 py-1.5 border-b border-[#1A1A22] bg-[#10121A]/85 text-[11px] text-zinc-300">
+          <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap">
+            <span className="font-semibold text-[#60A5FA]">Quick Start:</span>
+            <span>1. Drop or paste screenshot (Ctrl+V)</span>
+            <span className="text-zinc-600">·</span>
+            <span>2. Pick a Quick Look on the right</span>
+            <span className="text-zinc-600">·</span>
+            <span>3. Save PNG or MP4</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowQuickTips(false)}
+            className="p-0.5 text-zinc-500 hover:text-zinc-200 shrink-0 cursor-pointer"
+            title="Hide quick start bar"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* Main Centered Interactive Stage */}
       <div

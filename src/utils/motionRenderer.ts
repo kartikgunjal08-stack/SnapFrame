@@ -705,7 +705,7 @@ export function renderMotionFrame({
     cardH = cardW / 0.495;
   } else {
     cardW = Math.min(840, availW);
-    cardH = Math.min(520, availH * 0.88);
+    cardH = Math.min(height > width ? 820 : 520, availH * 0.88);
     const chromeReserve =
       showFrameHeader &&
       (preset.frameStyle === "macos-dark" ||

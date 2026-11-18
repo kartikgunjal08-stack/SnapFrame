@@ -28,6 +28,7 @@ import {
   Minimize2,
   Lock,
   Crop,
+  ChevronDown,
 } from "lucide-react";
 import { ImageCropModal } from "./ImageCropModal";
 import { SAMPLE_MOCKUPS } from "../data/presets";
@@ -198,6 +199,7 @@ export const ShortFilmStudioView: React.FC<ShortFilmStudioViewProps> = ({
 
   const [aspectId, setAspectId] = useState<FilmAspect>("16:9");
   const [phoneFormatMode, setPhoneFormatMode] = useState(false);
+  const [hidePhoneShell, setHidePhoneShell] = useState(false);
   const [phoneFitMode, setPhoneFitMode] = useState<PhoneFitMode>("showcase");
   const [mockupScale, setMockupScale] = useState(100);
   const [showBrandHeader, setShowBrandHeader] = useState(true);
@@ -240,6 +242,10 @@ export const ShortFilmStudioView: React.FC<ShortFilmStudioViewProps> = ({
   const rafRef = useRef<number | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [cropShotIndex, setCropShotIndex] = useState<number | null>(null);
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const [showProfiles, setShowProfiles] = useState(false);
+  const [showFilmGrade, setShowFilmGrade] = useState(false);
+  const [showCinemaFx, setShowCinemaFx] = useState(false);
 
   useEffect(() => {
     if (!isFullscreen) return;
@@ -287,10 +293,17 @@ export const ShortFilmStudioView: React.FC<ShortFilmStudioViewProps> = ({
     img.src = brandKit.logoDataUrl;
   }, [brandKit.logoDataUrl]);
 
+  const isPhoneContext = phoneFormatMode || preset.frameStyle === "iphone";
+
   const effectivePreset: ShortFilmPreset = useMemo(
     () => ({
       ...preset,
-      frameStyle: phoneFormatMode ? "iphone" : preset.frameStyle,
+      frameStyle:
+        hidePhoneShell && isPhoneContext
+          ? "frameless"
+          : phoneFormatMode
+            ? "iphone"
+            : preset.frameStyle,
       commercialArc,
       motionBlurTrails,
       flashBeats,
@@ -308,6 +321,8 @@ export const ShortFilmStudioView: React.FC<ShortFilmStudioViewProps> = ({
       cursorSpotlight,
       flashBeats,
       floorReflection,
+      hidePhoneShell,
+      isPhoneContext,
       kineticText,
       motionBlurTrails,
       particlesEnabled,
@@ -475,7 +490,20 @@ export const ShortFilmStudioView: React.FC<ShortFilmStudioViewProps> = ({
         onNotify("Converted Short Film to Mobile Phone Format (9:16 · iPhone)");
       } else {
         setAspectId("16:9");
+        setHidePhoneShell(false);
       }
+      return next;
+    });
+  };
+
+  const togglePhoneShell = () => {
+    setHidePhoneShell((prev) => {
+      const next = !prev;
+      onNotify(
+        next
+          ? "Removed Phone frame — showcasing screenshots independently"
+          : "Restored iPhone frame"
+      );
       return next;
     });
   };
@@ -867,7 +895,7 @@ export const ShortFilmStudioView: React.FC<ShortFilmStudioViewProps> = ({
             </span>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0 flex-wrap">
+          <div className="flex items-center gap-2 shrink-0 flex-wrap relative">
             <input
               ref={multiUploadRef}
               type="file"
@@ -882,40 +910,6 @@ export const ShortFilmStudioView: React.FC<ShortFilmStudioViewProps> = ({
             <button
               type="button"
               disabled={exportState.active}
-              onClick={() => setShowBrandHeader((v) => !v)}
-              title="Show or hide Brand Name / URL / Act header labels"
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium border cursor-pointer whitespace-nowrap transition-colors ${
-                showBrandHeader
-                  ? "bg-[#2563EB]/20 border-[#3B82F6] text-white"
-                  : "bg-[#18181F] hover:bg-[#22222C] border-[#282834] text-zinc-400"
-              }`}
-            >
-              {showBrandHeader ? (
-                <Eye className="w-3.5 h-3.5 text-[#60A5FA]" />
-              ) : (
-                <EyeOff className="w-3.5 h-3.5" />
-              )}
-              Brand / URL
-            </button>
-            <button
-              type="button"
-              disabled={exportState.active}
-              onClick={() => {
-                const pool = filteredPresets.length > 1 ? filteredPresets : SHORT_FILM_PRESETS;
-                const candidates = pool.filter((p) => p.id !== preset.id);
-                const next = candidates[Math.floor(Math.random() * candidates.length)] || SHORT_FILM_PRESETS[0];
-                applyPreset(next);
-                onNotify(`Remixed film cut to "${next.name}"`);
-              }}
-              title="Pick a fresh eye-catching Film Cut"
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-[#18181F] hover:bg-[#22222C] border border-[#282834] text-xs font-medium text-zinc-200 cursor-pointer whitespace-nowrap"
-            >
-              <Shuffle className="w-3.5 h-3.5 text-[#60A5FA]" />
-              Remix
-            </button>
-            <button
-              type="button"
-              disabled={exportState.active}
               onClick={togglePhoneFormat}
               title="Convert current template to vertical Phone Format (9:16 iPhone)"
               className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium border cursor-pointer whitespace-nowrap transition-colors ${
@@ -925,8 +919,32 @@ export const ShortFilmStudioView: React.FC<ShortFilmStudioViewProps> = ({
               }`}
             >
               <Smartphone className="w-3.5 h-3.5 text-[#60A5FA]" />
-              Phone Format
+              Phone
             </button>
+            {isPhoneContext && (
+              <button
+                type="button"
+                disabled={exportState.active}
+                onClick={togglePhoneShell}
+                title={
+                  hidePhoneShell
+                    ? "Show iPhone device frame around screenshots"
+                    : "Remove phone body and showcase screenshots independently"
+                }
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium border cursor-pointer whitespace-nowrap transition-colors ${
+                  hidePhoneShell
+                    ? "bg-[#2563EB]/20 border-[#3B82F6] text-white"
+                    : "bg-[#18181F] hover:bg-[#22222C] border-[#282834] text-zinc-200"
+                }`}
+              >
+                {hidePhoneShell ? (
+                  <Smartphone className="w-3.5 h-3.5 text-[#60A5FA]" />
+                ) : (
+                  <EyeOff className="w-3.5 h-3.5 text-[#60A5FA]" />
+                )}
+                {hidePhoneShell ? "Show Phone" : "Remove Phone"}
+              </button>
+            )}
             {!isFullscreen && (
               <>
                 <button
@@ -941,7 +959,7 @@ export const ShortFilmStudioView: React.FC<ShortFilmStudioViewProps> = ({
                   className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-[#2563EB] hover:bg-[#1D4ED8] text-xs font-semibold text-white cursor-pointer whitespace-nowrap"
                 >
                   {isPreviewLocked ? <Lock className="w-3.5 h-3.5" /> : <Upload className="w-3.5 h-3.5" />}
-                  {isPreviewLocked ? "Add Screenshots (Sign In)" : "Add Screenshots"}
+                  {isPreviewLocked ? "Sign In" : "Add Shots"}
                 </button>
                 <button
                   type="button"
@@ -950,16 +968,65 @@ export const ShortFilmStudioView: React.FC<ShortFilmStudioViewProps> = ({
                   className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-[#18181F] hover:bg-[#22222C] border border-[#282834] text-xs font-medium text-zinc-200 cursor-pointer whitespace-nowrap"
                 >
                   <Crop className="w-3.5 h-3.5 text-[#60A5FA]" />
-                  Crop Shot
+                  Crop
                 </button>
-                <button
-                  type="button"
-                  onClick={onOpenBrandKit}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-[#18181F] hover:bg-[#22222C] border border-[#282834] text-xs font-medium text-zinc-200 cursor-pointer whitespace-nowrap"
-                >
-                  <Palette className="w-3.5 h-3.5" style={{ color: brandKit.primaryColor }} />
-                  Brand Kit
-                </button>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setMoreMenuOpen((v) => !v)}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-[#18181F] hover:bg-[#22222C] border border-[#282834] text-xs font-medium text-zinc-200 cursor-pointer whitespace-nowrap"
+                  >
+                    More
+                    <ChevronDown className="w-3.5 h-3.5 text-zinc-400" />
+                  </button>
+                  {moreMenuOpen && (
+                    <div className="absolute right-0 mt-1.5 w-44 rounded-lg bg-[#14141B] border border-[#282836] shadow-2xl p-1.5 z-40 space-y-1">
+                      <button
+                        type="button"
+                        disabled={exportState.active}
+                        onClick={() => {
+                          const pool = filteredPresets.length > 1 ? filteredPresets : SHORT_FILM_PRESETS;
+                          const candidates = pool.filter((p) => p.id !== preset.id);
+                          const next = candidates[Math.floor(Math.random() * candidates.length)] || SHORT_FILM_PRESETS[0];
+                          applyPreset(next);
+                          onNotify(`Remixed film cut to "${next.name}"`);
+                          setMoreMenuOpen(false);
+                        }}
+                        className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs text-zinc-200 hover:bg-[#20202C] cursor-pointer"
+                      >
+                        <Shuffle className="w-3.5 h-3.5 text-[#60A5FA]" />
+                        Remix Video Cut
+                      </button>
+                      <button
+                        type="button"
+                        disabled={exportState.active}
+                        onClick={() => {
+                          setShowBrandHeader((v) => !v);
+                          setMoreMenuOpen(false);
+                        }}
+                        className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs text-zinc-200 hover:bg-[#20202C] cursor-pointer"
+                      >
+                        {showBrandHeader ? (
+                          <Eye className="w-3.5 h-3.5 text-[#60A5FA]" />
+                        ) : (
+                          <EyeOff className="w-3.5 h-3.5 text-zinc-400" />
+                        )}
+                        {showBrandHeader ? "Hide Brand Bar" : "Show Brand Bar"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onOpenBrandKit();
+                          setMoreMenuOpen(false);
+                        }}
+                        className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs text-zinc-200 hover:bg-[#20202C] cursor-pointer"
+                      >
+                        <Palette className="w-3.5 h-3.5" style={{ color: brandKit.primaryColor }} />
+                        Brand Kit
+                      </button>
+                    </div>
+                  )}
+                </div>
               </>
             )}
             <button
@@ -975,7 +1042,7 @@ export const ShortFilmStudioView: React.FC<ShortFilmStudioViewProps> = ({
               {isFullscreen ? (
                 <>
                   <Minimize2 className="w-3.5 h-3.5" />
-                  Exit Fullscreen
+                  Exit
                 </>
               ) : (
                 <>
@@ -1238,9 +1305,9 @@ export const ShortFilmStudioView: React.FC<ShortFilmStudioViewProps> = ({
           <div className="grid grid-cols-3 gap-1 p-1 rounded-lg bg-[#16161C] border border-[#24242E]">
             {(
               [
-                { id: "deal", label: "Brand Deal" },
-                { id: "look", label: "Look & FX" },
-                { id: "shot", label: "Shot Focus" },
+                { id: "deal", label: "1. Script" },
+                { id: "look", label: "2. Style" },
+                { id: "shot", label: "3. Shot" },
               ] as { id: InspectorTab; label: string }[]
             ).map((tab) => (
               <button
@@ -1263,49 +1330,62 @@ export const ShortFilmStudioView: React.FC<ShortFilmStudioViewProps> = ({
         <div className="flex-1 overflow-y-auto studio-scroll p-4 space-y-4">
           {inspectorTab === "deal" && (
             <>
-              {/* Saved Client Profiles */}
+              {/* Collapsible Saved Client Profiles */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-zinc-200">Client Profiles</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowProfiles((v) => !v)}
+                    className="flex items-center gap-1.5 text-xs font-semibold text-zinc-200 cursor-pointer"
+                  >
+                    <span>Saved Profiles ({savedProfiles.length})</span>
+                    <ChevronDown
+                      className={`w-3.5 h-3.5 text-zinc-400 transition-transform ${
+                        showProfiles ? "rotate-180" : ""
+                      }`}
+                    />
+                  </button>
                   <button
                     type="button"
                     onClick={saveCurrentClientProfile}
                     className="flex items-center gap-1 text-[11px] text-[#60A5FA] hover:text-white cursor-pointer"
                   >
                     <BookmarkPlus className="w-3.5 h-3.5" />
-                    Save Client
+                    Save
                   </button>
                 </div>
 
-                {savedProfiles.length > 0 ? (
-                  <div className="flex flex-wrap gap-1.5">
-                    {savedProfiles.map((prof) => (
-                      <div
-                        key={prof.id}
-                        className="flex items-center gap-1 pl-2 pr-1 py-1 rounded-md bg-[#16161C] border border-[#24242E] text-[11px] text-zinc-200"
-                      >
-                        <button
-                          type="button"
-                          onClick={() => applySavedProfile(prof)}
-                          className="hover:text-white cursor-pointer truncate max-w-[110px]"
+                {showProfiles && (
+                  savedProfiles.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {savedProfiles.map((prof) => (
+                        <div
+                          key={prof.id}
+                          className="flex items-center gap-1 pl-2 pr-1 py-1 rounded-md bg-[#16161C] border border-[#24242E] text-[11px] text-zinc-200"
                         >
-                          {prof.name}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => deleteSavedProfile(prof.id)}
-                          className="p-0.5 text-zinc-500 hover:text-red-400 cursor-pointer"
-                          title="Delete profile"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-[11px] text-zinc-500">
-                    Save client scripts here to reuse across future brand deals.
-                  </p>
+                          <button
+                            type="button"
+                            onClick={() => applySavedProfile(prof)}
+                            className="hover:text-white cursor-pointer truncate max-w-[110px]"
+                          >
+                            {prof.name}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteSavedProfile(prof.id)}
+                            className="p-0.5 text-zinc-500 hover:text-red-400 cursor-pointer"
+                            title="Delete profile"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-zinc-500">
+                      Save client scripts here to reuse them in 1 click.
+                    </p>
+                  )
                 )}
               </div>
 
@@ -1512,218 +1592,262 @@ export const ShortFilmStudioView: React.FC<ShortFilmStudioViewProps> = ({
                   />
                 </div>
 
-                {(phoneFormatMode || effectivePreset.frameStyle === "iphone") && (
-                  <div className="space-y-1.5 pt-2.5">
-                    <div className="flex items-center justify-between text-[11px] text-zinc-300">
-                      <span className="font-semibold">Desktop SS in Phone</span>
-                      <span className="text-[10px] text-zinc-500">Wide Fix</span>
-                    </div>
-                    <div className="grid grid-cols-3 gap-1">
-                      {(
-                        [
-                          { id: "showcase", label: "Pop-Out" },
-                          { id: "fit", label: "Full Card" },
-                          { id: "pan", label: "Fill & Pan" },
-                        ] as { id: PhoneFitMode; label: string }[]
-                      ).map((opt) => (
-                        <button
-                          key={opt.id}
-                          type="button"
-                          disabled={exportState.active}
-                          onClick={() => setPhoneFitMode(opt.id)}
-                          className={`py-1.5 px-1 rounded-md text-[10.5px] font-medium border cursor-pointer whitespace-nowrap transition-colors ${
-                            phoneFitMode === opt.id
-                              ? "bg-[#2563EB]/20 border-[#3B82F6] text-white"
-                              : "bg-[#141419] border-[#22222A] text-zinc-400 hover:text-zinc-200"
-                          }`}
-                        >
-                          {opt.label}
-                        </button>
-                      ))}
-                    </div>
+                {isPhoneContext && (
+                  <div className="space-y-2 pt-2.5">
+                    <button
+                      type="button"
+                      disabled={exportState.active}
+                      onClick={togglePhoneShell}
+                      className={`w-full flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-md border text-[11px] font-medium cursor-pointer transition-colors ${
+                        hidePhoneShell
+                          ? "bg-[#2563EB]/20 border-[#3B82F6] text-white"
+                          : "bg-[#16161C] hover:bg-[#20202A] border-[#282834] text-zinc-200"
+                      }`}
+                    >
+                      {hidePhoneShell ? (
+                        <>
+                          <Smartphone className="w-3.5 h-3.5 text-[#60A5FA]" />
+                          Show iPhone Frame
+                        </>
+                      ) : (
+                        <>
+                          <EyeOff className="w-3.5 h-3.5 text-[#60A5FA]" />
+                          Remove Phone (SS Only)
+                        </>
+                      )}
+                    </button>
+
+                    {!hidePhoneShell && effectivePreset.frameStyle === "iphone" && (
+                      <>
+                        <div className="flex items-center justify-between text-[11px] text-zinc-300">
+                          <span className="font-semibold">Desktop SS in Phone</span>
+                          <span className="text-[10px] text-zinc-500">Wide Fix</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-1">
+                          {(
+                            [
+                              { id: "showcase", label: "Pop-Out" },
+                              { id: "fit", label: "Full Card" },
+                              { id: "pan", label: "Fill & Pan" },
+                            ] as { id: PhoneFitMode; label: string }[]
+                          ).map((opt) => (
+                            <button
+                              key={opt.id}
+                              type="button"
+                              disabled={exportState.active}
+                              onClick={() => setPhoneFitMode(opt.id)}
+                              className={`py-1.5 px-1 rounded-md text-[10.5px] font-medium border cursor-pointer whitespace-nowrap transition-colors ${
+                                phoneFitMode === opt.id
+                                  ? "bg-[#2563EB]/20 border-[#3B82F6] text-white"
+                                  : "bg-[#141419] border-[#22222A] text-zinc-400 hover:text-zinc-200"
+                              }`}
+                            >
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
 
               <div className="h-px bg-[#1E1E24]" />
 
-              {/* Cinematic Film Look */}
+              {/* Collapsible Cinematic Film Look */}
               <div className="space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <h3 className="flex items-center gap-1.5 text-xs font-semibold text-zinc-200">
+                <button
+                  type="button"
+                  onClick={() => setShowFilmGrade((v) => !v)}
+                  className="w-full flex items-center justify-between text-xs font-semibold text-zinc-200 cursor-pointer"
+                >
+                  <span className="flex items-center gap-1.5">
                     <Aperture className="w-3.5 h-3.5 text-[#60A5FA]" />
-                    Cinematic Film Look
-                  </h3>
-                  {filmLook.id !== "none" && (
-                    <button
-                      type="button"
-                      onClick={() => setFilmLook(DEFAULT_FILM_LOOK)}
-                      className="text-[10px] text-zinc-400 hover:text-white cursor-pointer"
-                    >
-                      Reset
-                    </button>
-                  )}
-                </div>
+                    Color Filter & Grain
+                  </span>
+                  <ChevronDown
+                    className={`w-3.5 h-3.5 text-zinc-400 transition-transform ${
+                      showFilmGrade ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
 
-                <div className="grid grid-cols-2 gap-1.5">
-                  {FILM_LOOK_PRESETS.map((look) => {
-                    const active = filmLook.id === look.id;
-                    return (
-                      <button
-                        key={look.id}
-                        type="button"
-                        disabled={exportState.active}
-                        onClick={() =>
-                          setFilmLook((prev) => ({
-                            ...prev,
-                            id: look.id,
-                            intensity:
-                              look.id === "none" ? prev.intensity : Math.max(prev.intensity, 75),
-                          }))
-                        }
-                        className={`flex items-center gap-2 p-1.5 rounded-md border text-left transition-colors cursor-pointer ${
-                          active
-                            ? "bg-[#2563EB]/15 border-[#3B82F6]/70 text-white"
-                            : "bg-[#141419] border-[#22222A] text-zinc-300 hover:border-[#343440]"
-                        }`}
-                      >
-                        <span
-                          className="w-4 h-4 rounded shrink-0 border border-white/20"
-                          style={{ background: look.swatch }}
-                        />
-                        <div className="min-w-0">
-                          <div className="text-[10.5px] font-semibold leading-tight truncate">
-                            {look.name}
-                          </div>
-                          <div className="text-[9px] text-zinc-500 leading-tight">{look.tag}</div>
+                {showFilmGrade && (
+                  <>
+                    <div className="grid grid-cols-2 gap-1.5 pt-1">
+                      {FILM_LOOK_PRESETS.map((look) => {
+                        const active = filmLook.id === look.id;
+                        return (
+                          <button
+                            key={look.id}
+                            type="button"
+                            disabled={exportState.active}
+                            onClick={() =>
+                              setFilmLook((prev) => ({
+                                ...prev,
+                                id: look.id,
+                                intensity:
+                                  look.id === "none" ? prev.intensity : Math.max(prev.intensity, 75),
+                              }))
+                            }
+                            className={`flex items-center gap-2 p-1.5 rounded-md border text-left transition-colors cursor-pointer ${
+                              active
+                                ? "bg-[#2563EB]/15 border-[#3B82F6]/70 text-white"
+                                : "bg-[#141419] border-[#22222A] text-zinc-300 hover:border-[#343440]"
+                            }`}
+                          >
+                            <span
+                              className="w-4 h-4 rounded shrink-0 border border-white/20"
+                              style={{ background: look.swatch }}
+                            />
+                            <div className="min-w-0">
+                              <div className="text-[10.5px] font-semibold leading-tight truncate">
+                                {look.name}
+                              </div>
+                              <div className="text-[9px] text-zinc-500 leading-tight">{look.tag}</div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <div className="space-y-2 pt-1">
+                      <div>
+                        <div className="flex items-center justify-between text-[10px] text-zinc-400 mb-1">
+                          <span>Filter Intensity</span>
+                          <span className="font-mono-tabular text-zinc-300">{filmLook.intensity}%</span>
                         </div>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <div className="space-y-2 pt-1">
-                  <div>
-                    <div className="flex items-center justify-between text-[10px] text-zinc-400 mb-1">
-                      <span>Grade Intensity</span>
-                      <span className="font-mono-tabular text-zinc-300">{filmLook.intensity}%</span>
-                    </div>
-                    <input
-                      type="range"
-                      min={0}
-                      max={100}
-                      value={filmLook.intensity}
-                      disabled={filmLook.id === "none" || exportState.active}
-                      onChange={(e) =>
-                        setFilmLook((prev) => ({ ...prev, intensity: Number(e.target.value) }))
-                      }
-                      className="studio-slider w-full disabled:opacity-40"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <div className="flex items-center justify-between text-[10px] text-zinc-400 mb-1">
-                        <span>Vignette</span>
-                        <span className="font-mono-tabular text-zinc-300">{filmLook.vignette}%</span>
+                        <input
+                          type="range"
+                          min={0}
+                          max={100}
+                          value={filmLook.intensity}
+                          disabled={filmLook.id === "none" || exportState.active}
+                          onChange={(e) =>
+                            setFilmLook((prev) => ({ ...prev, intensity: Number(e.target.value) }))
+                          }
+                          className="studio-slider w-full disabled:opacity-40"
+                        />
                       </div>
-                      <input
-                        type="range"
-                        min={0}
-                        max={100}
-                        value={filmLook.vignette}
-                        disabled={exportState.active}
-                        onChange={(e) =>
-                          setFilmLook((prev) => ({ ...prev, vignette: Number(e.target.value) }))
-                        }
-                        className="studio-slider w-full"
-                      />
-                    </div>
-                    <div>
-                      <div className="flex items-center justify-between text-[10px] text-zinc-400 mb-1">
-                        <span>35mm Grain</span>
-                        <span className="font-mono-tabular text-zinc-300">{filmLook.filmGrain}%</span>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <div className="flex items-center justify-between text-[10px] text-zinc-400 mb-1">
+                            <span>Vignette</span>
+                            <span className="font-mono-tabular text-zinc-300">{filmLook.vignette}%</span>
+                          </div>
+                          <input
+                            type="range"
+                            min={0}
+                            max={100}
+                            value={filmLook.vignette}
+                            disabled={exportState.active}
+                            onChange={(e) =>
+                              setFilmLook((prev) => ({ ...prev, vignette: Number(e.target.value) }))
+                            }
+                            className="studio-slider w-full"
+                          />
+                        </div>
+                        <div>
+                          <div className="flex items-center justify-between text-[10px] text-zinc-400 mb-1">
+                            <span>35mm Grain</span>
+                            <span className="font-mono-tabular text-zinc-300">{filmLook.filmGrain}%</span>
+                          </div>
+                          <input
+                            type="range"
+                            min={0}
+                            max={100}
+                            value={filmLook.filmGrain}
+                            disabled={exportState.active}
+                            onChange={(e) =>
+                              setFilmLook((prev) => ({ ...prev, filmGrain: Number(e.target.value) }))
+                            }
+                            className="studio-slider w-full"
+                          />
+                        </div>
                       </div>
-                      <input
-                        type="range"
-                        min={0}
-                        max={100}
-                        value={filmLook.filmGrain}
-                        disabled={exportState.active}
-                        onChange={(e) =>
-                          setFilmLook((prev) => ({ ...prev, filmGrain: Number(e.target.value) }))
-                        }
-                        className="studio-slider w-full"
-                      />
                     </div>
-                  </div>
-                </div>
+                  </>
+                )}
               </div>
 
               <div className="h-px bg-[#1E1E24]" />
 
-              {/* Compact Commercial & Cinema FX */}
+              {/* Collapsible Commercial & Cinema FX */}
               <div className="space-y-1.5">
-                <div className="flex items-center justify-between mb-1">
-                  <h3 className="text-xs font-semibold text-zinc-200">Cinema FX</h3>
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCinemaBars(false);
-                        setMotionBlurTrails(false);
-                        setFlashBeats(false);
-                        setChromaticSplit(false);
-                        setParticlesEnabled(false);
-                      }}
-                      className="px-1.5 py-0.5 rounded bg-[#16161C] hover:bg-[#22222C] border border-[#262632] text-[10px] text-zinc-300 cursor-pointer"
-                    >
-                      Clean
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCommercialArc(true);
-                        setCursorSpotlight(true);
-                        setParticlesEnabled(true);
-                        setCinemaBars(true);
-                        setMotionBlurTrails(true);
-                        setFlashBeats(true);
-                        setChromaticSplit(true);
-                        setFloorReflection(true);
-                        setKineticText(true);
-                      }}
-                      className="px-1.5 py-0.5 rounded bg-[#2563EB]/20 hover:bg-[#2563EB]/30 border border-[#3B82F6]/50 text-[10px] text-blue-200 cursor-pointer"
-                    >
-                      Full FX
-                    </button>
+                <button
+                  type="button"
+                  onClick={() => setShowCinemaFx((v) => !v)}
+                  className="w-full flex items-center justify-between text-xs font-semibold text-zinc-200 cursor-pointer"
+                >
+                  <span>Advanced Cinema FX</span>
+                  <ChevronDown
+                    className={`w-3.5 h-3.5 text-zinc-400 transition-transform ${
+                      showCinemaFx ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
+                {showCinemaFx && (
+                  <div className="space-y-1.5 pt-1">
+                    <div className="flex items-center justify-end gap-1 pb-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCinemaBars(false);
+                          setMotionBlurTrails(false);
+                          setFlashBeats(false);
+                          setChromaticSplit(false);
+                          setParticlesEnabled(false);
+                        }}
+                        className="px-1.5 py-0.5 rounded bg-[#16161C] hover:bg-[#22222C] border border-[#262632] text-[10px] text-zinc-300 cursor-pointer"
+                      >
+                        Clean
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCommercialArc(true);
+                          setCursorSpotlight(true);
+                          setParticlesEnabled(true);
+                          setCinemaBars(true);
+                          setMotionBlurTrails(true);
+                          setFlashBeats(true);
+                          setChromaticSplit(true);
+                          setFloorReflection(true);
+                          setKineticText(true);
+                        }}
+                        className="px-1.5 py-0.5 rounded bg-[#2563EB]/20 hover:bg-[#2563EB]/30 border border-[#3B82F6]/50 text-[10px] text-blue-200 cursor-pointer"
+                      >
+                        All FX
+                      </button>
+                    </div>
+                    {[
+                      { label: "Brand & URL Headings", val: showBrandHeader, set: setShowBrandHeader },
+                      { label: "6-Act Commercial Story", val: commercialArc, set: setCommercialArc },
+                      { label: "Cursor Click Zooms", val: cursorSpotlight, set: setCursorSpotlight },
+                      { label: "Ambient Sparks", val: particlesEnabled, set: setParticlesEnabled },
+                      { label: "Letterbox Cinema Bars", val: cinemaBars, set: setCinemaBars },
+                      { label: "Motion Blur Trails", val: motionBlurTrails, set: setMotionBlurTrails },
+                      { label: "Beat Flash Cuts", val: flashBeats, set: setFlashBeats },
+                      { label: "RGB Chromatic Split", val: chromaticSplit, set: setChromaticSplit },
+                      { label: "Floor Reflection", val: floorReflection, set: setFloorReflection },
+                      { label: "Kinetic Shot Titles", val: kineticText, set: setKineticText },
+                      { label: "Brand Colors", val: useBrandKit, set: setUseBrandKit },
+                    ].map((fx) => (
+                      <label
+                        key={fx.label}
+                        className="flex items-center justify-between text-xs text-zinc-300 cursor-pointer"
+                      >
+                        <span>{fx.label}</span>
+                        <input
+                          type="checkbox"
+                          checked={fx.val}
+                          onChange={(e) => fx.set(e.target.checked)}
+                          className="accent-[#2563EB]"
+                        />
+                      </label>
+                    ))}
                   </div>
-                </div>
-                {[
-                  { label: "Brand & URL Headings", val: showBrandHeader, set: setShowBrandHeader },
-                  { label: "6-Act Commercial Story", val: commercialArc, set: setCommercialArc },
-                  { label: "Cursor Click Zooms", val: cursorSpotlight, set: setCursorSpotlight },
-                  { label: "Ambient Sparks", val: particlesEnabled, set: setParticlesEnabled },
-                  { label: "Letterbox Cinema Bars", val: cinemaBars, set: setCinemaBars },
-                  { label: "Motion Blur Trails", val: motionBlurTrails, set: setMotionBlurTrails },
-                  { label: "Beat Flash Cuts", val: flashBeats, set: setFlashBeats },
-                  { label: "RGB Chromatic Split", val: chromaticSplit, set: setChromaticSplit },
-                  { label: "Floor Reflection", val: floorReflection, set: setFloorReflection },
-                  { label: "Kinetic Shot Titles", val: kineticText, set: setKineticText },
-                  { label: "Brand Kit Colors", val: useBrandKit, set: setUseBrandKit },
-                ].map((fx) => (
-                  <label
-                    key={fx.label}
-                    className="flex items-center justify-between text-xs text-zinc-300 cursor-pointer"
-                  >
-                    <span>{fx.label}</span>
-                    <input
-                      type="checkbox"
-                      checked={fx.val}
-                      onChange={(e) => fx.set(e.target.checked)}
-                      className="accent-[#2563EB]"
-                    />
-                  </label>
-                ))}
+                )}
               </div>
             </>
           )}

@@ -20,6 +20,7 @@ import {
   Minimize2,
   Lock,
   Crop,
+  ChevronDown,
 } from "lucide-react";
 import { ImageCropModal } from "./ImageCropModal";
 import { MOTION_CATEGORIES, MOTION_PRESETS } from "../data/motionPresets";
@@ -76,6 +77,7 @@ export const MotionStudioView: React.FC<MotionStudioViewProps> = ({
   const [activePreset, setActivePreset] = useState<MotionPreset>(MOTION_PRESETS[0]);
   const [aspectId, setAspectId] = useState<MotionAspectId>("16:9");
   const [phoneFormatMode, setPhoneFormatMode] = useState(false);
+  const [hidePhoneShell, setHidePhoneShell] = useState(false);
   const [phoneFitMode, setPhoneFitMode] = useState<PhoneFitMode>("showcase");
   const [mockupScale, setMockupScale] = useState(100);
   const [duration, setDuration] = useState<MotionDuration>(MOTION_PRESETS[0].defaultDuration);
@@ -97,6 +99,8 @@ export const MotionStudioView: React.FC<MotionStudioViewProps> = ({
   const [isPlaying, setIsPlaying] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [cropOpen, setCropOpen] = useState(false);
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const [motionTab, setMotionTab] = useState<"basic" | "effects">("basic");
   const [currentTime, setCurrentTime] = useState(0);
 
   useEffect(() => {
@@ -154,12 +158,19 @@ export const MotionStudioView: React.FC<MotionStudioViewProps> = ({
 
   const dims = MOTION_ASPECT_DIMENSIONS[aspectId];
 
+  const isPhoneContext = phoneFormatMode || activePreset.frameStyle === "iphone";
+
   const effectivePreset: MotionPreset = useMemo(
-    () =>
-      phoneFormatMode
-        ? { ...activePreset, frameStyle: "iphone" }
-        : activePreset,
-    [activePreset, phoneFormatMode]
+    () => ({
+      ...activePreset,
+      frameStyle:
+        hidePhoneShell && isPhoneContext
+          ? "frameless"
+          : phoneFormatMode
+            ? "iphone"
+            : activePreset.frameStyle,
+    }),
+    [activePreset, hidePhoneShell, isPhoneContext, phoneFormatMode]
   );
 
   const drawAtTime = useCallback(
@@ -278,6 +289,19 @@ export const MotionStudioView: React.FC<MotionStudioViewProps> = ({
     setPhoneFormatMode((prev) => {
       const next = !prev;
       setAspectId(next ? "9:16" : activePreset.defaultAspect || "16:9");
+      if (!next) setHidePhoneShell(false);
+      return next;
+    });
+  };
+
+  const togglePhoneShell = () => {
+    setHidePhoneShell((prev) => {
+      const next = !prev;
+      onNotify(
+        next
+          ? "Removed Phone frame — showcasing screenshot independently"
+          : "Restored iPhone frame"
+      );
       return next;
     });
   };
@@ -593,75 +617,7 @@ export const MotionStudioView: React.FC<MotionStudioViewProps> = ({
             </span>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0 flex-wrap">
-            <button
-              type="button"
-              onClick={() => setIsFullscreen((f) => !f)}
-              title={isFullscreen ? "Exit Full Screen (Esc)" : "Watch Motion Full Screen without exporting"}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs font-medium cursor-pointer whitespace-nowrap transition-colors ${
-                isFullscreen
-                  ? "bg-[#2563EB] border-[#3B82F6] text-white"
-                  : "bg-[#18181F] hover:bg-[#22222C] border-[#282834] text-zinc-200"
-              }`}
-            >
-              {isFullscreen ? (
-                <>
-                  <Minimize2 className="w-3.5 h-3.5" />
-                  Exit Fullscreen
-                </>
-              ) : (
-                <>
-                  <Maximize2 className="w-3.5 h-3.5 text-[#60A5FA]" />
-                  Fullscreen
-                </>
-              )}
-            </button>
-            <button
-              type="button"
-              disabled={exportState.active}
-              onClick={() => setShowFrameHeader((v) => !v)}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs font-medium cursor-pointer whitespace-nowrap transition-colors ${
-                showFrameHeader
-                  ? "bg-[#2563EB]/20 border-[#3B82F6] text-white"
-                  : "bg-[#18181F] hover:bg-[#22222C] border-[#282834] text-zinc-400"
-              }`}
-              title="Show or hide Brand Name / URL in frame heading bar"
-            >
-              {showFrameHeader ? (
-                <Eye className="w-3.5 h-3.5 text-[#60A5FA]" />
-              ) : (
-                <EyeOff className="w-3.5 h-3.5" />
-              )}
-              Brand / URL
-            </button>
-            <button
-              type="button"
-              disabled={exportState.active}
-              onClick={() => setShowHeadline((v) => !v)}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs font-medium cursor-pointer whitespace-nowrap transition-colors ${
-                showHeadline
-                  ? "bg-[#2563EB]/20 border-[#3B82F6] text-white"
-                  : "bg-[#18181F] hover:bg-[#22222C] border-[#282834] text-zinc-400"
-              }`}
-              title="Show or hide top Eyebrow & Headline popup"
-            >
-              {showHeadline ? (
-                <Eye className="w-3.5 h-3.5 text-[#60A5FA]" />
-              ) : (
-                <EyeOff className="w-3.5 h-3.5" />
-              )}
-              Headline
-            </button>
-            <button
-              type="button"
-              disabled={exportState.active}
-              onClick={handleRemixMotion}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-[#18181F] hover:bg-[#22222C] border border-[#282834] text-xs font-medium text-zinc-200 cursor-pointer whitespace-nowrap"
-              title="Pick a fresh eye-catching Motion template"
-            >
-              <Shuffle className="w-3.5 h-3.5 text-[#60A5FA]" />
-              Remix
-            </button>
+          <div className="flex items-center gap-2 shrink-0 flex-wrap relative">
             <button
               type="button"
               disabled={exportState.active}
@@ -671,11 +627,35 @@ export const MotionStudioView: React.FC<MotionStudioViewProps> = ({
                   ? "bg-[#2563EB]/20 border-[#3B82F6] text-white"
                   : "bg-[#18181F] hover:bg-[#22222C] border-[#282834] text-zinc-200"
               }`}
-              title="Convert selected Motion template into vertical iPhone 9:16 format"
+              title="Convert selected Motion template into vertical 9:16 format"
             >
               <Smartphone className="w-3.5 h-3.5 text-[#60A5FA]" />
-              Phone Format
+              Phone
             </button>
+            {isPhoneContext && (
+              <button
+                type="button"
+                disabled={exportState.active}
+                onClick={togglePhoneShell}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs font-medium cursor-pointer whitespace-nowrap transition-colors ${
+                  hidePhoneShell
+                    ? "bg-[#2563EB]/20 border-[#3B82F6] text-white"
+                    : "bg-[#18181F] hover:bg-[#22222C] border-[#282834] text-zinc-200"
+                }`}
+                title={
+                  hidePhoneShell
+                    ? "Show iPhone device frame around screenshot"
+                    : "Remove phone body and showcase screenshot independently"
+                }
+              >
+                {hidePhoneShell ? (
+                  <Smartphone className="w-3.5 h-3.5 text-[#60A5FA]" />
+                ) : (
+                  <EyeOff className="w-3.5 h-3.5 text-[#60A5FA]" />
+                )}
+                {hidePhoneShell ? "Show Phone" : "Remove Phone"}
+              </button>
+            )}
             {!isFullscreen && (
               <>
                 <input
@@ -698,14 +678,14 @@ export const MotionStudioView: React.FC<MotionStudioViewProps> = ({
                     }
                     fileInputRef.current?.click();
                   }}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-[#18181F] hover:bg-[#22222C] border border-[#282834] text-xs font-medium text-zinc-200 cursor-pointer whitespace-nowrap"
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-[#2563EB] hover:bg-[#1D4ED8] text-xs font-semibold text-white cursor-pointer whitespace-nowrap"
                 >
                   {isPreviewLocked ? (
-                    <Lock className="w-3.5 h-3.5 text-amber-400" />
+                    <Lock className="w-3.5 h-3.5" />
                   ) : (
-                    <Upload className="w-3.5 h-3.5 text-[#60A5FA]" />
+                    <Upload className="w-3.5 h-3.5" />
                   )}
-                  {isPreviewLocked ? "Replace Screenshot (Sign In)" : "Replace Screenshot"}
+                  {isPreviewLocked ? "Sign In" : "Replace SS"}
                 </button>
                 <button
                   type="button"
@@ -716,16 +696,99 @@ export const MotionStudioView: React.FC<MotionStudioViewProps> = ({
                   <Crop className="w-3.5 h-3.5 text-[#60A5FA]" />
                   Crop
                 </button>
-                <button
-                  type="button"
-                  onClick={onOpenBrandKit}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-[#18181F] hover:bg-[#22222C] border border-[#282834] text-xs font-medium text-zinc-200 cursor-pointer whitespace-nowrap"
-                >
-                  <Palette className="w-3.5 h-3.5" style={{ color: brandKit.primaryColor }} />
-                  Brand Kit
-                </button>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setMoreMenuOpen((v) => !v)}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-[#18181F] hover:bg-[#22222C] border border-[#282834] text-xs font-medium text-zinc-200 cursor-pointer whitespace-nowrap"
+                  >
+                    More
+                    <ChevronDown className="w-3.5 h-3.5 text-zinc-400" />
+                  </button>
+                  {moreMenuOpen && (
+                    <div className="absolute right-0 mt-1.5 w-44 rounded-lg bg-[#14141B] border border-[#282836] shadow-2xl p-1.5 z-40 space-y-1">
+                      <button
+                        type="button"
+                        disabled={exportState.active}
+                        onClick={() => {
+                          handleRemixMotion();
+                          setMoreMenuOpen(false);
+                        }}
+                        className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs text-zinc-200 hover:bg-[#20202C] cursor-pointer"
+                      >
+                        <Shuffle className="w-3.5 h-3.5 text-[#60A5FA]" />
+                        Remix Motion
+                      </button>
+                      <button
+                        type="button"
+                        disabled={exportState.active}
+                        onClick={() => {
+                          setShowHeadline((v) => !v);
+                          setMoreMenuOpen(false);
+                        }}
+                        className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs text-zinc-200 hover:bg-[#20202C] cursor-pointer"
+                      >
+                        {showHeadline ? (
+                          <Eye className="w-3.5 h-3.5 text-[#60A5FA]" />
+                        ) : (
+                          <EyeOff className="w-3.5 h-3.5 text-zinc-400" />
+                        )}
+                        {showHeadline ? "Hide Headline" : "Show Headline"}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={exportState.active}
+                        onClick={() => {
+                          setShowFrameHeader((v) => !v);
+                          setMoreMenuOpen(false);
+                        }}
+                        className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs text-zinc-200 hover:bg-[#20202C] cursor-pointer"
+                      >
+                        {showFrameHeader ? (
+                          <Eye className="w-3.5 h-3.5 text-[#60A5FA]" />
+                        ) : (
+                          <EyeOff className="w-3.5 h-3.5 text-zinc-400" />
+                        )}
+                        {showFrameHeader ? "Hide Brand Bar" : "Show Brand Bar"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onOpenBrandKit();
+                          setMoreMenuOpen(false);
+                        }}
+                        className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs text-zinc-200 hover:bg-[#20202C] cursor-pointer"
+                      >
+                        <Palette className="w-3.5 h-3.5" style={{ color: brandKit.primaryColor }} />
+                        Brand Kit
+                      </button>
+                    </div>
+                  )}
+                </div>
               </>
             )}
+            <button
+              type="button"
+              onClick={() => setIsFullscreen((f) => !f)}
+              title={isFullscreen ? "Exit Full Screen (Esc)" : "Watch Motion Full Screen"}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs font-medium cursor-pointer whitespace-nowrap transition-colors ${
+                isFullscreen
+                  ? "bg-[#2563EB] border-[#3B82F6] text-white"
+                  : "bg-[#18181F] hover:bg-[#22222C] border-[#282834] text-zinc-200"
+              }`}
+            >
+              {isFullscreen ? (
+                <>
+                  <Minimize2 className="w-3.5 h-3.5" />
+                  Exit
+                </>
+              ) : (
+                <>
+                  <Maximize2 className="w-3.5 h-3.5 text-[#60A5FA]" />
+                  Fullscreen
+                </>
+              )}
+            </button>
           </div>
         </div>
 
@@ -809,304 +872,355 @@ export const MotionStudioView: React.FC<MotionStudioViewProps> = ({
         </div>
       </section>
 
-      {/* Right Rail: Motion Controls & Export */}
-      <aside className="order-3 w-full lg:w-[276px] shrink-0 border-t lg:border-t-0 lg:border-l border-[#1E1E24] bg-[#101014] flex flex-col justify-between overflow-y-auto studio-scroll">
-        <div className="p-4 space-y-5">
-          <div>
-            <h3 className="text-xs font-semibold text-zinc-200 mb-2">Duration</h3>
-            <div className="grid grid-cols-3 gap-1.5">
-              {([3, 5, 8] as MotionDuration[]).map((d) => (
-                <button
-                  key={d}
-                  type="button"
-                  disabled={exportState.active}
-                  onClick={() => {
-                    setDuration(d);
-                    currentTimeRef.current = 0;
-                    setCurrentTime(0);
-                  }}
-                  className={`py-1.5 rounded-md text-xs font-mono-tabular font-medium border cursor-pointer ${
-                    duration === d
-                      ? "bg-[#2563EB]/15 border-[#3B82F6]/60 text-white"
-                      : "bg-[#141419] border-[#22222A] text-zinc-400 hover:text-zinc-200"
-                  }`}
-                >
-                  {d}s
-                </button>
-              ))}
-            </div>
+      {/* Right Rail: Clean 2-Tab Motion Controls & Export */}
+      <aside className="order-3 w-full lg:w-[276px] shrink-0 border-t lg:border-t-0 lg:border-l border-[#1E1E24] bg-[#101014] flex flex-col justify-between min-h-0">
+        <div className="p-3 border-b border-[#1E1E24] bg-[#0D0D11]">
+          <div className="grid grid-cols-2 gap-1 p-1 rounded-lg bg-[#16161C] border border-[#24242E]">
+            <button
+              type="button"
+              onClick={() => setMotionTab("basic")}
+              className={`py-1.5 rounded-md text-xs font-semibold cursor-pointer transition-colors ${
+                motionTab === "basic"
+                  ? "bg-[#2563EB] text-white"
+                  : "text-zinc-400 hover:text-zinc-200"
+              }`}
+            >
+              Basic Setup
+            </button>
+            <button
+              type="button"
+              onClick={() => setMotionTab("effects")}
+              className={`py-1.5 rounded-md text-xs font-semibold cursor-pointer transition-colors ${
+                motionTab === "effects"
+                  ? "bg-[#2563EB] text-white"
+                  : "text-zinc-400 hover:text-zinc-200"
+              }`}
+            >
+              Effects & Polish
+            </button>
           </div>
+        </div>
 
-          <div>
-            <div className="flex items-center justify-between text-xs font-semibold text-zinc-200 mb-1.5">
-              <span>Screenshot Size (SS)</span>
-              <span className="font-mono-tabular text-[11px] text-[#60A5FA]">{mockupScale}%</span>
-            </div>
-            <input
-              type="range"
-              min={55}
-              max={145}
-              disabled={exportState.active}
-              value={mockupScale}
-              onChange={(e) => setMockupScale(Number(e.target.value))}
-              className="studio-slider"
-            />
-          </div>
-
-          {(phoneFormatMode || effectivePreset.frameStyle === "iphone") && (
-            <div className="space-y-1.5 pt-1">
-              <div className="flex items-center justify-between text-[11px] text-zinc-300">
-                <span className="font-semibold">Desktop SS in Phone</span>
-                <span className="text-[10px] text-zinc-500">Wide Fix</span>
+        <div className="flex-1 overflow-y-auto studio-scroll p-4 space-y-5">
+          {motionTab === "basic" ? (
+            <>
+              <div>
+                <h3 className="text-xs font-semibold text-zinc-200 mb-2">Duration</h3>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {([3, 5, 8] as MotionDuration[]).map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      disabled={exportState.active}
+                      onClick={() => {
+                        setDuration(d);
+                        currentTimeRef.current = 0;
+                        setCurrentTime(0);
+                      }}
+                      className={`py-1.5 rounded-md text-xs font-mono-tabular font-medium border cursor-pointer ${
+                        duration === d
+                          ? "bg-[#2563EB]/15 border-[#3B82F6]/60 text-white"
+                          : "bg-[#141419] border-[#22222A] text-zinc-400 hover:text-zinc-200"
+                      }`}
+                    >
+                      {d}s
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="grid grid-cols-3 gap-1">
-                {(
-                  [
-                    { id: "showcase", label: "Pop-Out" },
-                    { id: "fit", label: "Full Card" },
-                    { id: "pan", label: "Fill & Pan" },
-                  ] as { id: PhoneFitMode; label: string }[]
-                ).map((opt) => (
+
+              <div>
+                <div className="flex items-center justify-between text-xs font-semibold text-zinc-200 mb-1.5">
+                  <span>Screenshot Size</span>
+                  <span className="font-mono-tabular text-[11px] text-[#60A5FA]">{mockupScale}%</span>
+                </div>
+                <input
+                  type="range"
+                  min={55}
+                  max={145}
+                  disabled={exportState.active}
+                  value={mockupScale}
+                  onChange={(e) => setMockupScale(Number(e.target.value))}
+                  className="studio-slider"
+                />
+              </div>
+
+              {isPhoneContext && (
+                <div className="space-y-2 pt-1">
                   <button
-                    key={opt.id}
                     type="button"
                     disabled={exportState.active}
-                    onClick={() => setPhoneFitMode(opt.id)}
-                    className={`py-1.5 px-1 rounded-md text-[10.5px] font-medium border cursor-pointer whitespace-nowrap transition-colors ${
-                      phoneFitMode === opt.id
+                    onClick={togglePhoneShell}
+                    className={`w-full flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-md border text-[11px] font-medium cursor-pointer transition-colors ${
+                      hidePhoneShell
                         ? "bg-[#2563EB]/20 border-[#3B82F6] text-white"
-                        : "bg-[#141419] border-[#22222A] text-zinc-400 hover:text-zinc-200"
+                        : "bg-[#16161C] hover:bg-[#20202A] border-[#282834] text-zinc-200"
                     }`}
                   >
-                    {opt.label}
+                    {hidePhoneShell ? (
+                      <>
+                        <Smartphone className="w-3.5 h-3.5 text-[#60A5FA]" />
+                        Show iPhone Frame
+                      </>
+                    ) : (
+                      <>
+                        <EyeOff className="w-3.5 h-3.5 text-[#60A5FA]" />
+                        Remove Phone (SS Only)
+                      </>
+                    )}
                   </button>
-                ))}
-              </div>
-            </div>
-          )}
 
-          <div>
-            <h3 className="text-xs font-semibold text-zinc-200 mb-2">Aspect Ratio</h3>
-            <div className="grid grid-cols-3 gap-1.5">
-              {(Object.keys(MOTION_ASPECT_DIMENSIONS) as MotionAspectId[]).map((id) => (
-                <button
-                  key={id}
-                  type="button"
-                  disabled={exportState.active}
-                  onClick={() => setAspectId(id)}
-                  className={`py-1.5 rounded-md text-[11px] font-mono-tabular font-medium border cursor-pointer ${
-                    aspectId === id
-                      ? "bg-[#2563EB]/15 border-[#3B82F6]/60 text-white"
-                      : "bg-[#141419] border-[#22222A] text-zinc-400 hover:text-zinc-200"
-                  }`}
-                >
-                  {id}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <h3 className="text-xs font-semibold text-zinc-200 mb-2">Easing Curve</h3>
-            <div className="grid grid-cols-2 gap-1.5">
-              {EASING_OPTIONS.map((opt) => (
-                <button
-                  key={opt.id}
-                  type="button"
-                  disabled={exportState.active}
-                  onClick={() => setEasing(opt.id)}
-                  className={`py-1.5 px-2 rounded-md text-[11px] font-medium border cursor-pointer whitespace-nowrap ${
-                    easing === opt.id
-                      ? "bg-[#2563EB]/15 border-[#3B82F6]/60 text-white"
-                      : "bg-[#141419] border-[#22222A] text-zinc-400 hover:text-zinc-200"
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="h-px bg-[#1E1E24]" />
-
-          <div className="space-y-2.5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-zinc-200">Apply Brand Kit DNA</span>
-              <input
-                type="checkbox"
-                checked={useBrandKit}
-                onChange={(e) => setUseBrandKit(e.target.checked)}
-                className="accent-[#2563EB] cursor-pointer"
-              />
-            </div>
-
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-zinc-200">Show Brand / URL Bar</span>
-              <input
-                type="checkbox"
-                checked={showFrameHeader}
-                onChange={(e) => setShowFrameHeader(e.target.checked)}
-                className="accent-[#2563EB] cursor-pointer"
-              />
-            </div>
-
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-zinc-200">Headline Overlay</span>
-              <input
-                type="checkbox"
-                checked={showHeadline}
-                onChange={(e) => setShowHeadline(e.target.checked)}
-                className="accent-[#2563EB] cursor-pointer"
-              />
-            </div>
-
-            {showHeadline && (
-              <div className="space-y-2 pt-1">
-                <input
-                  type="text"
-                  value={eyebrow}
-                  onChange={(e) => setEyebrow(e.target.value)}
-                  placeholder="Eyebrow"
-                  className="w-full px-2.5 py-1.5 rounded-md bg-[#16161C] border border-[#24242E] text-xs text-zinc-100 focus:outline-none focus:border-[#3B82F6]"
-                />
-                <input
-                  type="text"
-                  value={headline}
-                  onChange={(e) => setHeadline(e.target.value)}
-                  placeholder="Headline"
-                  className="w-full px-2.5 py-1.5 rounded-md bg-[#16161C] border border-[#24242E] text-xs text-zinc-100 focus:outline-none focus:border-[#3B82F6]"
-                />
-              </div>
-            )}
-          </div>
-
-          <div className="h-px bg-[#1E1E24]" />
-
-          {/* Eye-Catch FX (Unique Cursor + Zoom Loupe + Floating Stat Badge) */}
-          <div className="space-y-2.5">
-            <div className="flex items-center justify-between">
-              <h3 className="flex items-center gap-1.5 text-xs font-semibold text-white">
-                <Sparkles className="w-3.5 h-3.5 text-[#60A5FA]" />
-                Eye-Catch FX
-              </h3>
-              <button
-                type="button"
-                onClick={() => {
-                  const next = !(cursorSpotlight || zoomLoupe || Boolean(floatingBadge));
-                  setCursorSpotlight(next);
-                  setZoomLoupe(next);
-                  setAmbientAura(next);
-                  setFloorReflection(next);
-                  setFloatingBadge(next ? "⚡ +340% Faster" : "");
-                }}
-                className="text-[10px] text-[#60A5FA] hover:text-white cursor-pointer"
-              >
-                {cursorSpotlight || zoomLoupe ? "Clean Mode" : "Pro Pop"}
-              </button>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-zinc-300">Animated Cursor Click</span>
-              <input
-                type="checkbox"
-                checked={cursorSpotlight}
-                onChange={(e) => setCursorSpotlight(e.target.checked)}
-                className="accent-[#2563EB] cursor-pointer"
-              />
-            </div>
-
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-zinc-300">1.85× Magnifier Loupe</span>
-              <input
-                type="checkbox"
-                checked={zoomLoupe}
-                onChange={(e) => setZoomLoupe(e.target.checked)}
-                className="accent-[#2563EB] cursor-pointer"
-              />
-            </div>
-
-            {(cursorSpotlight || zoomLoupe) && (
-              <div className="space-y-1.5 pt-0.5">
-                <div className="flex items-center justify-between text-[10px] text-zinc-400">
-                  <span className="flex items-center gap-1">
-                    <Crosshair className="w-3 h-3 text-[#60A5FA]" />
-                    Click target on screenshot
-                  </span>
-                  <span className="font-mono-tabular">
-                    {Math.round(focusX * 100)}%, {Math.round(focusY * 100)}%
-                  </span>
+                  {!hidePhoneShell && effectivePreset.frameStyle === "iphone" && (
+                    <>
+                      <div className="flex items-center justify-between text-[11px] text-zinc-300">
+                        <span className="font-semibold">Desktop SS in Phone</span>
+                        <span className="text-[10px] text-zinc-500">Fit</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-1">
+                        {(
+                          [
+                            { id: "showcase", label: "Pop-Out" },
+                            { id: "fit", label: "Full Card" },
+                            { id: "pan", label: "Fill & Pan" },
+                          ] as { id: PhoneFitMode; label: string }[]
+                        ).map((opt) => (
+                          <button
+                            key={opt.id}
+                            type="button"
+                            disabled={exportState.active}
+                            onClick={() => setPhoneFitMode(opt.id)}
+                            className={`py-1.5 px-1 rounded-md text-[10.5px] font-medium border cursor-pointer whitespace-nowrap transition-colors ${
+                              phoneFitMode === opt.id
+                                ? "bg-[#2563EB]/20 border-[#3B82F6] text-white"
+                                : "bg-[#141419] border-[#22222A] text-zinc-400 hover:text-zinc-200"
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </div>
-                <div
-                  onClick={(e) => {
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    setFocusX(Math.max(0.08, Math.min(0.92, (e.clientX - rect.left) / rect.width)));
-                    setFocusY(Math.max(0.08, Math.min(0.92, (e.clientY - rect.top) / rect.height)));
-                  }}
-                  className="relative rounded-md overflow-hidden border border-[#2C2C38] bg-[#07080C] cursor-crosshair aspect-video"
-                >
-                  <img src={imageSrc} alt="Focus target" className="w-full h-full object-contain" />
-                  <span
-                    className="absolute w-4 h-4 -ml-2 -mt-2 rounded-full border-2 border-[#60A5FA] bg-[#2563EB]/35 shadow-lg pointer-events-none"
-                    style={{ left: `${focusX * 100}%`, top: `${focusY * 100}%` }}
+              )}
+
+              <div>
+                <h3 className="text-xs font-semibold text-zinc-200 mb-2">Aspect Ratio</h3>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {(Object.keys(MOTION_ASPECT_DIMENSIONS) as MotionAspectId[]).map((id) => (
+                    <button
+                      key={id}
+                      type="button"
+                      disabled={exportState.active}
+                      onClick={() => setAspectId(id)}
+                      className={`py-1.5 rounded-md text-[11px] font-mono-tabular font-medium border cursor-pointer ${
+                        aspectId === id
+                          ? "bg-[#2563EB]/15 border-[#3B82F6]/60 text-white"
+                          : "bg-[#141419] border-[#22222A] text-zinc-400 hover:text-zinc-200"
+                      }`}
+                    >
+                      {id}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="h-px bg-[#1E1E24]" />
+
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-zinc-200">Headline Text</span>
+                  <input
+                    type="checkbox"
+                    checked={showHeadline}
+                    onChange={(e) => setShowHeadline(e.target.checked)}
+                    className="accent-[#2563EB] cursor-pointer"
+                  />
+                </div>
+
+                {showHeadline && (
+                  <div className="space-y-2 pt-1">
+                    <input
+                      type="text"
+                      value={eyebrow}
+                      onChange={(e) => setEyebrow(e.target.value)}
+                      placeholder="Eyebrow"
+                      className="w-full px-2.5 py-1.5 rounded-md bg-[#16161C] border border-[#24242E] text-xs text-zinc-100 focus:outline-none focus:border-[#3B82F6]"
+                    />
+                    <input
+                      type="text"
+                      value={headline}
+                      onChange={(e) => setHeadline(e.target.value)}
+                      placeholder="Headline"
+                      className="w-full px-2.5 py-1.5 rounded-md bg-[#16161C] border border-[#24242E] text-xs text-zinc-100 focus:outline-none focus:border-[#3B82F6]"
+                    />
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              <div>
+                <h3 className="text-xs font-semibold text-zinc-200 mb-2">Motion Style</h3>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {EASING_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      disabled={exportState.active}
+                      onClick={() => setEasing(opt.id)}
+                      className={`py-1.5 px-2 rounded-md text-[11px] font-medium border cursor-pointer whitespace-nowrap ${
+                        easing === opt.id
+                          ? "bg-[#2563EB]/15 border-[#3B82F6]/60 text-white"
+                          : "bg-[#141419] border-[#22222A] text-zinc-400 hover:text-zinc-200"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="h-px bg-[#1E1E24]" />
+
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-zinc-200">Apply Brand Colors</span>
+                  <input
+                    type="checkbox"
+                    checked={useBrandKit}
+                    onChange={(e) => setUseBrandKit(e.target.checked)}
+                    className="accent-[#2563EB] cursor-pointer"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-zinc-200">Show Brand / URL Bar</span>
+                  <input
+                    type="checkbox"
+                    checked={showFrameHeader}
+                    onChange={(e) => setShowFrameHeader(e.target.checked)}
+                    className="accent-[#2563EB] cursor-pointer"
                   />
                 </div>
               </div>
-            )}
 
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between text-[11px] text-zinc-300">
-                <span>Floating 3D Stat Pill</span>
-                {floatingBadge && (
+              <div className="h-px bg-[#1E1E24]" />
+
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <h3 className="flex items-center gap-1.5 text-xs font-semibold text-white">
+                    <Sparkles className="w-3.5 h-3.5 text-[#60A5FA]" />
+                    Visual Effects
+                  </h3>
                   <button
                     type="button"
-                    onClick={() => setFloatingBadge("")}
-                    className="text-[10px] text-zinc-500 hover:text-zinc-200 cursor-pointer"
+                    onClick={() => {
+                      const next = !(cursorSpotlight || zoomLoupe || Boolean(floatingBadge));
+                      setCursorSpotlight(next);
+                      setZoomLoupe(next);
+                      setAmbientAura(next);
+                      setFloorReflection(next);
+                      setFloatingBadge(next ? "⚡ +340% Faster" : "");
+                    }}
+                    className="text-[10px] text-[#60A5FA] hover:text-white cursor-pointer"
                   >
-                    Hide
+                    {cursorSpotlight || zoomLoupe ? "Clean Mode" : "All Effects"}
                   </button>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-zinc-300">Animated Cursor Click</span>
+                  <input
+                    type="checkbox"
+                    checked={cursorSpotlight}
+                    onChange={(e) => setCursorSpotlight(e.target.checked)}
+                    className="accent-[#2563EB] cursor-pointer"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-zinc-300">1.85× Magnifier Loupe</span>
+                  <input
+                    type="checkbox"
+                    checked={zoomLoupe}
+                    onChange={(e) => setZoomLoupe(e.target.checked)}
+                    className="accent-[#2563EB] cursor-pointer"
+                  />
+                </div>
+
+                {(cursorSpotlight || zoomLoupe) && (
+                  <div className="space-y-1.5 pt-0.5">
+                    <div className="flex items-center justify-between text-[10px] text-zinc-400">
+                      <span className="flex items-center gap-1">
+                        <Crosshair className="w-3 h-3 text-[#60A5FA]" />
+                        Click focus point
+                      </span>
+                      <span className="font-mono-tabular">
+                        {Math.round(focusX * 100)}%, {Math.round(focusY * 100)}%
+                      </span>
+                    </div>
+                    <div
+                      onClick={(e) => {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        setFocusX(Math.max(0.08, Math.min(0.92, (e.clientX - rect.left) / rect.width)));
+                        setFocusY(Math.max(0.08, Math.min(0.92, (e.clientY - rect.top) / rect.height)));
+                      }}
+                      className="relative rounded-md overflow-hidden border border-[#2C2C38] bg-[#07080C] cursor-crosshair aspect-video"
+                    >
+                      <img src={imageSrc} alt="Focus target" className="w-full h-full object-contain" />
+                      <span
+                        className="absolute w-4 h-4 -ml-2 -mt-2 rounded-full border-2 border-[#60A5FA] bg-[#2563EB]/35 shadow-lg pointer-events-none"
+                        style={{ left: `${focusX * 100}%`, top: `${focusY * 100}%` }}
+                      />
+                    </div>
+                  </div>
                 )}
-              </div>
-              <input
-                type="text"
-                value={floatingBadge}
-                onChange={(e) => setFloatingBadge(e.target.value)}
-                placeholder="e.g. ⚡ +340% Conversion (blank to hide)"
-                className="w-full px-2.5 py-1.5 rounded-md bg-[#16161C] border border-[#24242E] text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-[#3B82F6]"
-              />
-              <div className="flex flex-wrap gap-1">
-                {["⚡ +340% Faster", "★ 4.9 Rated", "10x Launch", "New v2.0"].map((chip) => (
-                  <button
-                    key={chip}
-                    type="button"
-                    onClick={() => setFloatingBadge(chip)}
-                    className="px-1.5 py-0.5 rounded bg-[#16161C] hover:bg-[#22222C] border border-[#262632] text-[10px] text-zinc-300 cursor-pointer"
-                  >
-                    {chip}
-                  </button>
-                ))}
-              </div>
-            </div>
 
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-zinc-300">Ambient Aura Glow</span>
-              <input
-                type="checkbox"
-                checked={ambientAura}
-                onChange={(e) => setAmbientAura(e.target.checked)}
-                className="accent-[#2563EB] cursor-pointer"
-              />
-            </div>
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-[11px] text-zinc-300">
+                    <span>Floating Stat Pill</span>
+                    {floatingBadge && (
+                      <button
+                        type="button"
+                        onClick={() => setFloatingBadge("")}
+                        className="text-[10px] text-zinc-500 hover:text-zinc-200 cursor-pointer"
+                      >
+                        Hide
+                      </button>
+                    )}
+                  </div>
+                  <input
+                    type="text"
+                    value={floatingBadge}
+                    onChange={(e) => setFloatingBadge(e.target.value)}
+                    placeholder="Optional stat pill"
+                    className="w-full px-2.5 py-1.5 rounded-md bg-[#16161C] border border-[#24242E] text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-[#3B82F6]"
+                  />
+                </div>
 
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-zinc-300">Stage Floor Reflection</span>
-              <input
-                type="checkbox"
-                checked={floorReflection}
-                onChange={(e) => setFloorReflection(e.target.checked)}
-                className="accent-[#2563EB] cursor-pointer"
-              />
-            </div>
-          </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-zinc-300">Ambient Aura Glow</span>
+                  <input
+                    type="checkbox"
+                    checked={ambientAura}
+                    onChange={(e) => setAmbientAura(e.target.checked)}
+                    className="accent-[#2563EB] cursor-pointer"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-zinc-300">Stage Floor Reflection</span>
+                  <input
+                    type="checkbox"
+                    checked={floorReflection}
+                    onChange={(e) => setFloorReflection(e.target.checked)}
+                    className="accent-[#2563EB] cursor-pointer"
+                  />
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Browser Export Actions (bottom safe clearance for host preview badges) */}

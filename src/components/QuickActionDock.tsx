@@ -9,6 +9,8 @@ import {
   Grid,
   X,
   Crop,
+  Smartphone,
+  EyeOff,
 } from "lucide-react";
 import {
   BackdropPattern,
@@ -252,6 +254,33 @@ export const QuickActionDock: React.FC<QuickActionDockProps> = ({
               <Layers className="w-3.5 h-3.5 text-zinc-400" />
               Frame: {state.frame}
             </button>
+            {(state.frame === "iphone" || state.aspectRatio === "9:16") && (
+              <button
+                type="button"
+                onClick={() =>
+                  onUpdate({
+                    frame: state.frame === "iphone" ? "none" : "iphone",
+                  })
+                }
+                title={
+                  state.frame === "iphone"
+                    ? "Remove phone frame and showcase screenshot independently"
+                    : "Restore iPhone device frame"
+                }
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium whitespace-nowrap shrink-0 cursor-pointer ${
+                  state.frame !== "iphone"
+                    ? "bg-[#2563EB]/20 border-[#3B82F6] text-white"
+                    : "bg-[#1A1A23] hover:bg-[#232330] border-[#2A2A36] text-zinc-100"
+                }`}
+              >
+                {state.frame === "iphone" ? (
+                  <EyeOff className="w-3.5 h-3.5 text-[#60A5FA]" />
+                ) : (
+                  <Smartphone className="w-3.5 h-3.5 text-[#60A5FA]" />
+                )}
+                {state.frame === "iphone" ? "Remove Phone" : "Show Phone"}
+              </button>
+            )}
             <div className="flex items-center rounded-lg bg-[#1A1A23] border border-[#2A2A36] shrink-0">
               <button
                 type="button"

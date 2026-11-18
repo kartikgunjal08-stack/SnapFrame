@@ -1,5 +1,17 @@
 import React, { useRef, useState } from "react";
-import { Download, Copy, Check, Image as ImageIcon, RotateCw, ChevronDown, Video, Sparkles } from "lucide-react";
+import {
+  Download,
+  Copy,
+  Check,
+  Image as ImageIcon,
+  RotateCw,
+  ChevronDown,
+  Video,
+  Sparkles,
+  Smartphone,
+  EyeOff,
+  SlidersHorizontal,
+} from "lucide-react";
 import { BACKGROUND_PRESETS } from "../data/presets";
 import {
   BackdropPattern,
@@ -59,6 +71,94 @@ const PATTERN_OPTIONS: { id: BackdropPattern; label: string }[] = [
   { id: "rings", label: "Rings" },
 ];
 
+const QUICK_LOOKS: {
+  id: string;
+  label: string;
+  patch: Partial<StudioState>;
+}[] = [
+  {
+    id: "clean-mac",
+    label: "Clean Desktop",
+    patch: {
+      frame: "macos-dark",
+      aspectRatio: "16:9",
+      backgroundId: "cobalt-eclipse",
+      useCustomSolid: false,
+      customBgImage: null,
+      tiltPreset: "flat",
+      rotateX: 0,
+      rotateY: 0,
+      rotateZ: 0,
+      shadow: "elevated",
+      scale: 88,
+      padding: 52,
+      cssAnimation: "entrance-rise",
+      captionLightText: true,
+    },
+  },
+  {
+    id: "3d-launch",
+    label: "3D Showcase",
+    patch: {
+      frame: "glass",
+      aspectRatio: "16:9",
+      backgroundId: "midnight-aurora",
+      useCustomSolid: false,
+      customBgImage: null,
+      tiltPreset: "left",
+      rotateX: 6,
+      rotateY: 13,
+      rotateZ: 0,
+      shadow: "dramatic",
+      scale: 86,
+      padding: 56,
+      cssAnimation: "tilt-orbit",
+      captionLightText: true,
+    },
+  },
+  {
+    id: "phone-reel",
+    label: "Phone Reel",
+    patch: {
+      frame: "iphone",
+      aspectRatio: "9:16",
+      backgroundId: "sunset-ember",
+      useCustomSolid: false,
+      customBgImage: null,
+      tiltPreset: "flat",
+      rotateX: 0,
+      rotateY: 0,
+      rotateZ: 0,
+      phoneFit: "showcase",
+      padding: 24,
+      scale: 105,
+      cssAnimation: "float-hover",
+      captionLightText: true,
+    },
+  },
+  {
+    id: "ss-only-vert",
+    label: "SS Only (9:16)",
+    patch: {
+      frame: "none",
+      aspectRatio: "9:16",
+      backgroundId: "cobalt-eclipse",
+      useCustomSolid: false,
+      customBgImage: null,
+      tiltPreset: "flat",
+      rotateX: 0,
+      rotateY: 0,
+      rotateZ: 0,
+      borderRadius: 16,
+      shadow: "dramatic",
+      padding: 28,
+      scale: 94,
+      cssAnimation: "spring-pop",
+      captionLightText: true,
+    },
+  },
+];
+
 export const RightInspector: React.FC<RightInspectorProps> = ({
   state,
   isExporting,
@@ -81,7 +181,10 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
   onExportAllSocialPresets,
 }) => {
   const bgFileRef = useRef<HTMLInputElement>(null);
+  const [showMoreColors, setShowMoreColors] = useState(false);
+  const [showAdvanced3D, setShowAdvanced3D] = useState(false);
   const [showFineTilt, setShowFineTilt] = useState(false);
+  const [showExportOpts, setShowExportOpts] = useState(false);
   const [activeTab, setActiveTab] = useState<"style" | "depth" | "presets" | "history">("style");
 
   const handleBgUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -97,8 +200,10 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
     e.target.value = "";
   };
 
+  const visibleBackdrops = showMoreColors ? BACKGROUND_PRESETS : BACKGROUND_PRESETS.slice(0, 7);
+
   return (
-    <aside className="w-full lg:w-[312px] shrink-0 border-t lg:border-t-0 lg:border-l border-[#1E1E24] bg-[#101014] flex flex-col min-h-0">
+    <aside className="w-full lg:w-[304px] shrink-0 border-t lg:border-t-0 lg:border-l border-[#1E1E24] bg-[#101014] flex flex-col min-h-0">
       {/* Clean 4-Tab Header */}
       <div className="p-3 border-b border-[#1E1E24] bg-[#0D0D11]">
         <div className="grid grid-cols-4 gap-1 p-1 rounded-lg bg-[#16161C] border border-[#24242E]">
@@ -111,7 +216,7 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
                 : "text-zinc-400 hover:text-zinc-200"
             }`}
           >
-            Style
+            Look
           </button>
           <button
             type="button"
@@ -122,7 +227,7 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
                 : "text-zinc-400 hover:text-zinc-200"
             }`}
           >
-            Size & 3D
+            3D & Motion
           </button>
           <button
             type="button"
@@ -133,7 +238,7 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
                 : "text-zinc-400 hover:text-zinc-200"
             }`}
           >
-            Presets
+            Social
           </button>
           <button
             type="button"
@@ -144,7 +249,7 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
                 : "text-zinc-400 hover:text-zinc-200"
             }`}
           >
-            <span>History</span>
+            <span>Undo</span>
             {historyEntries.length > 1 && (
               <span
                 className={`text-[9px] font-mono-tabular px-1 rounded ${
@@ -182,9 +287,31 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
           />
         ) : activeTab === "style" ? (
           <>
-            {/* 1. Device Frame */}
+            {/* 1. One-Click Quick Looks */}
             <section>
-              <h3 className="text-xs font-semibold text-zinc-200 tracking-wide mb-2.5">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-xs font-semibold text-white">1-Click Quick Looks</h3>
+                <span className="text-[10px] text-zinc-500">Instant style</span>
+              </div>
+              <div className="grid grid-cols-2 gap-1.5">
+                {QUICK_LOOKS.map((look) => (
+                  <button
+                    key={look.id}
+                    type="button"
+                    onClick={() => onUpdate(look.patch)}
+                    className="px-2.5 py-2 rounded-lg bg-[#15151C] hover:bg-[#1E1E2A] border border-[#262634] hover:border-[#3B82F6]/60 text-[11px] font-medium text-zinc-100 text-left transition-colors cursor-pointer"
+                  >
+                    {look.label}
+                  </button>
+                ))}
+              </div>
+            </section>
+
+            <div className="h-px bg-[#1E1E24]" />
+
+            {/* 2. Device Frame */}
+            <section>
+              <h3 className="text-xs font-semibold text-zinc-200 tracking-wide mb-2">
                 Device Frame
               </h3>
               <div className="grid grid-cols-3 gap-1.5">
@@ -196,7 +323,7 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
                     { id: "iphone", label: "iPhone" },
                     { id: "tablet", label: "Tablet" },
                     { id: "glass", label: "Glass" },
-                    { id: "none", label: "Frameless" },
+                    { id: "none", label: "No Frame (SS Only)" },
                   ] as { id: FrameType; label: string }[]
                 ).map((f) => {
                   const active = state.frame === f.id;
@@ -218,26 +345,40 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
                   );
                 })}
               </div>
-              {(state.frame === "macos-dark" ||
-                state.frame === "macos-light" ||
-                state.frame === "browser" ||
-                state.frame === "iphone") && (
-                <label className="mt-2.5 flex items-center justify-between text-[11px] text-zinc-300 cursor-pointer">
-                  <span>Show Brand / URL Bar</span>
-                  <input
-                    type="checkbox"
-                    checked={state.showFrameHeader !== false}
-                    onChange={(e) => onUpdate({ showFrameHeader: e.target.checked })}
-                    className="accent-[#2563EB]"
-                  />
-                </label>
+
+              {(state.frame === "iphone" || state.aspectRatio === "9:16") && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    onUpdate({
+                      frame: state.frame === "iphone" ? "none" : "iphone",
+                    })
+                  }
+                  className={`mt-2 w-full flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-md border text-[11px] font-medium cursor-pointer transition-colors ${
+                    state.frame !== "iphone" && state.aspectRatio === "9:16"
+                      ? "bg-[#2563EB]/20 border-[#3B82F6] text-white"
+                      : "bg-[#16161C] hover:bg-[#20202A] border-[#282834] text-zinc-200"
+                  }`}
+                >
+                  {state.frame === "iphone" ? (
+                    <>
+                      <EyeOff className="w-3.5 h-3.5 text-[#60A5FA]" />
+                      Remove Phone (Show SS Only)
+                    </>
+                  ) : (
+                    <>
+                      <Smartphone className="w-3.5 h-3.5 text-[#60A5FA]" />
+                      Show iPhone Frame
+                    </>
+                  )}
+                </button>
               )}
 
               {state.frame === "iphone" && (
                 <div className="mt-3 pt-2.5 border-t border-[#1E1E24] space-y-2">
                   <div className="flex items-center justify-between text-[11px] text-zinc-300">
                     <span className="font-medium">Desktop SS in Phone</span>
-                    <span className="text-[10px] text-zinc-500">Wide Fix</span>
+                    <span className="text-[10px] text-zinc-500">Fit style</span>
                   </div>
                   <div className="grid grid-cols-3 gap-1">
                     {(
@@ -267,7 +408,7 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
                   {(state.phoneFit ?? "showcase") === "pan" && (
                     <div>
                       <div className="flex items-center justify-between text-[10.5px] text-zinc-400 mb-1">
-                        <span>Horizontal Focus Pan</span>
+                        <span>Horizontal Pan</span>
                         <span className="font-mono-tabular text-zinc-300">
                           {state.phonePanX ?? 50}%
                         </span>
@@ -288,10 +429,10 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
 
             <div className="h-px bg-[#1E1E24]" />
 
-            {/* 2. Backdrop */}
+            {/* 3. Background */}
             <section>
-              <div className="flex items-center justify-between mb-2.5">
-                <h3 className="text-xs font-semibold text-zinc-200 tracking-wide">Backdrop</h3>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-xs font-semibold text-zinc-200 tracking-wide">Background</h3>
                 <div className="flex items-center gap-1.5">
                   <input
                     ref={bgFileRef}
@@ -334,7 +475,7 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
               </div>
 
               <div className="grid grid-cols-7 gap-1.5">
-                {BACKGROUND_PRESETS.map((bg) => {
+                {visibleBackdrops.map((bg) => {
                   const isSelected =
                     !state.useCustomSolid && !state.customBgImage && state.backgroundId === bg.id;
                   return (
@@ -361,127 +502,113 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
                 })}
               </div>
 
-              <div className="mt-3">
-                <span className="block text-[11px] text-zinc-400 mb-1.5">Pattern</span>
-                <div className="grid grid-cols-5 gap-1">
-                  {PATTERN_OPTIONS.map((pat) => (
-                    <button
-                      key={pat.id}
-                      type="button"
-                      onClick={() => onUpdate({ pattern: pat.id })}
-                      className={`py-1.5 rounded-md text-[11px] font-medium border transition-colors whitespace-nowrap cursor-pointer ${
-                        state.pattern === pat.id
-                          ? "bg-[#2563EB]/15 border-[#3B82F6]/60 text-white"
-                          : "bg-[#141419] border-[#22222A] text-zinc-400 hover:text-zinc-200"
-                      }`}
-                    >
-                      {pat.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="mt-3">
-                <div className="flex items-center justify-between text-[11px] text-zinc-400 mb-1.5">
-                  <span>Film Grain</span>
-                  <span className="font-mono-tabular text-zinc-300">{state.grainOpacity}%</span>
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={35}
-                  value={state.grainOpacity}
-                  onChange={(e) => onUpdate({ grainOpacity: Number(e.target.value) })}
-                  className="studio-slider"
+              <button
+                type="button"
+                onClick={() => setShowMoreColors((v) => !v)}
+                className="mt-2.5 w-full flex items-center justify-between text-[11px] text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
+              >
+                <span>More Colors, Pattern & Grain</span>
+                <ChevronDown
+                  className={`w-3.5 h-3.5 transition-transform ${showMoreColors ? "rotate-180" : ""}`}
                 />
-              </div>
+              </button>
+
+              {showMoreColors && (
+                <div className="space-y-3 pt-2.5">
+                  <div>
+                    <span className="block text-[11px] text-zinc-400 mb-1.5">Pattern</span>
+                    <div className="grid grid-cols-5 gap-1">
+                      {PATTERN_OPTIONS.map((pat) => (
+                        <button
+                          key={pat.id}
+                          type="button"
+                          onClick={() => onUpdate({ pattern: pat.id })}
+                          className={`py-1.5 rounded-md text-[11px] font-medium border transition-colors whitespace-nowrap cursor-pointer ${
+                            state.pattern === pat.id
+                              ? "bg-[#2563EB]/15 border-[#3B82F6]/60 text-white"
+                              : "bg-[#141419] border-[#22222A] text-zinc-400 hover:text-zinc-200"
+                          }`}
+                        >
+                          {pat.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between text-[11px] text-zinc-400 mb-1">
+                      <span>Film Grain</span>
+                      <span className="font-mono-tabular text-zinc-300">{state.grainOpacity}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0}
+                      max={35}
+                      value={state.grainOpacity}
+                      onChange={(e) => onUpdate({ grainOpacity: Number(e.target.value) })}
+                      className="studio-slider"
+                    />
+                  </div>
+                </div>
+              )}
             </section>
           </>
         ) : (
-          /* 3. Depth & 3D Tab */
+          /* 3. 3D & Motion Tab (Essential controls upfront, fine sliders tucked neatly) */
           <section className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-semibold text-zinc-200 tracking-wide">Layout & 3D</h3>
-              {(state.rotateX !== 0 || state.rotateY !== 0 || state.rotateZ !== 0) && (
-                <button
-                  type="button"
-                  onClick={() => onUpdate({ tiltPreset: "flat", rotateX: 0, rotateY: 0, rotateZ: 0 })}
-                  className="flex items-center gap-1 text-[11px] text-zinc-400 hover:text-white cursor-pointer"
-                >
-                  <RotateCw className="w-3 h-3" />
-                  Zero 3D
-                </button>
-              )}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-1.5 text-xs font-semibold text-white">
+                  <Sparkles className="w-3.5 h-3.5 text-[#60A5FA]" />
+                  Motion Animation
+                </span>
+                <span className="text-[10px] font-mono-tabular text-zinc-500">4s MP4</span>
+              </div>
+              <div className="grid grid-cols-3 gap-1">
+                {(
+                  [
+                    { id: "tilt-orbit", label: "3D Sway" },
+                    { id: "entrance-rise", label: "Rise In" },
+                    { id: "float-hover", label: "Float" },
+                    { id: "spring-pop", label: "Spring" },
+                    { id: "none", label: "Static" },
+                  ] as { id: StudioCssAnimation; label: string }[]
+                ).map((anim) => {
+                  const active = (state.cssAnimation ?? "tilt-orbit") === anim.id;
+                  return (
+                    <button
+                      key={anim.id}
+                      type="button"
+                      onClick={() => onUpdate({ cssAnimation: anim.id })}
+                      className={`py-1.5 px-1 rounded-md text-[11px] font-medium border transition-colors whitespace-nowrap cursor-pointer ${
+                        active
+                          ? "bg-[#2563EB]/20 border-[#3B82F6] text-white"
+                          : "bg-[#141419] border-[#22222A] text-zinc-400 hover:text-zinc-200"
+                      }`}
+                    >
+                      {anim.label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <div className="flex items-center justify-between text-[11px] text-zinc-400 mb-1">
-                  <span>Padding</span>
-                  <span className="font-mono-tabular text-zinc-300">{state.padding}</span>
-                </div>
-                <input
-                  type="range"
-                  min={16}
-                  max={110}
-                  value={state.padding}
-                  onChange={(e) => onUpdate({ padding: Number(e.target.value) })}
-                  className="studio-slider"
-                />
-              </div>
-              <div>
-                <div className="flex items-center justify-between text-[11px] text-zinc-400 mb-1">
-                  <span>Radius</span>
-                  <span className="font-mono-tabular text-zinc-300">{state.borderRadius}</span>
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={32}
-                  value={state.borderRadius}
-                  onChange={(e) => onUpdate({ borderRadius: Number(e.target.value) })}
-                  className="studio-slider"
-                />
-              </div>
-            </div>
+            <div className="h-px bg-[#1E1E24]" />
 
             <div>
-              <div className="flex items-center justify-between text-[11px] text-zinc-400 mb-1">
-                <span>Screenshot Size (SS)</span>
-                <span className="font-mono-tabular text-zinc-300">{state.scale}%</span>
-              </div>
-              <input
-                type="range"
-                min={45}
-                max={145}
-                value={state.scale}
-                onChange={(e) => onUpdate({ scale: Number(e.target.value) })}
-                className="studio-slider"
-              />
-            </div>
-
-            <div>
-              <span className="block text-[11px] text-zinc-400 mb-1.5">Shadow</span>
-              <div className="grid grid-cols-4 gap-1">
-                {(["none", "soft", "elevated", "dramatic"] as ShadowLevel[]).map((lvl) => (
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs font-semibold text-white">3D Angle</span>
+                {(state.rotateX !== 0 || state.rotateY !== 0 || state.rotateZ !== 0) && (
                   <button
-                    key={lvl}
                     type="button"
-                    onClick={() => onUpdate({ shadow: lvl })}
-                    className={`py-1.5 rounded-md text-[11px] font-medium capitalize border transition-colors whitespace-nowrap cursor-pointer ${
-                      state.shadow === lvl
-                        ? "bg-[#2563EB]/15 border-[#3B82F6]/60 text-white"
-                        : "bg-[#141419] border-[#22222A] text-zinc-400 hover:text-zinc-200"
-                    }`}
+                    onClick={() => onUpdate({ tiltPreset: "flat", rotateX: 0, rotateY: 0, rotateZ: 0 })}
+                    className="flex items-center gap-1 text-[11px] text-zinc-400 hover:text-white cursor-pointer"
                   >
-                    {lvl}
+                    <RotateCw className="w-3 h-3" />
+                    Flat
                   </button>
-                ))}
+                )}
               </div>
-            </div>
-
-            <div>
-              <span className="block text-[11px] text-zinc-400 mb-1.5">3D Angle</span>
               <div className="grid grid-cols-5 gap-1">
                 {(Object.keys(TILT_VALUES) as TiltPreset[]).map((preset) => {
                   const item = TILT_VALUES[preset];
@@ -511,239 +638,286 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
               </div>
             </div>
 
+            <div>
+              <div className="flex items-center justify-between text-xs font-semibold text-white mb-1.5">
+                <span>Screenshot Size</span>
+                <span className="font-mono-tabular text-[11px] text-[#60A5FA]">{state.scale}%</span>
+              </div>
+              <input
+                type="range"
+                min={45}
+                max={145}
+                value={state.scale}
+                onChange={(e) => onUpdate({ scale: Number(e.target.value) })}
+                className="studio-slider"
+              />
+            </div>
+
+            <div className="h-px bg-[#1E1E24]" />
+
             <button
               type="button"
-              onClick={() => setShowFineTilt((v) => !v)}
-              className="w-full flex items-center justify-between pt-1 text-[11px] text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
+              onClick={() => setShowAdvanced3D((v) => !v)}
+              className="w-full flex items-center justify-between py-1 text-xs font-medium text-zinc-300 hover:text-white transition-colors cursor-pointer"
             >
-              <span>Fine 3D Sliders (X / Y / Z)</span>
+              <span className="flex items-center gap-1.5">
+                <SlidersHorizontal className="w-3.5 h-3.5 text-[#60A5FA]" />
+                Fine Adjust (Padding, Shadow & Loupe)
+              </span>
               <ChevronDown
-                className={`w-3.5 h-3.5 transition-transform ${showFineTilt ? "rotate-180" : ""}`}
+                className={`w-3.5 h-3.5 transition-transform ${showAdvanced3D ? "rotate-180" : ""}`}
               />
             </button>
 
-            {showFineTilt && (
-              <div className="space-y-2.5 pt-1">
+            {showAdvanced3D && (
+              <div className="space-y-4 pt-1">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <div className="flex items-center justify-between text-[11px] text-zinc-400 mb-1">
-                      <span>Tilt X</span>
-                      <span className="font-mono-tabular text-zinc-300">{state.rotateX}°</span>
+                      <span>Padding</span>
+                      <span className="font-mono-tabular text-zinc-300">{state.padding}</span>
                     </div>
                     <input
                       type="range"
-                      min={-25}
-                      max={25}
-                      value={state.rotateX}
-                      onChange={(e) => onUpdate({ rotateX: Number(e.target.value) })}
+                      min={16}
+                      max={110}
+                      value={state.padding}
+                      onChange={(e) => onUpdate({ padding: Number(e.target.value) })}
                       className="studio-slider"
                     />
                   </div>
                   <div>
                     <div className="flex items-center justify-between text-[11px] text-zinc-400 mb-1">
-                      <span>Tilt Y</span>
-                      <span className="font-mono-tabular text-zinc-300">{state.rotateY}°</span>
+                      <span>Corners</span>
+                      <span className="font-mono-tabular text-zinc-300">{state.borderRadius}</span>
                     </div>
                     <input
                       type="range"
-                      min={-25}
-                      max={25}
-                      value={state.rotateY}
-                      onChange={(e) => onUpdate({ rotateY: Number(e.target.value) })}
+                      min={0}
+                      max={32}
+                      value={state.borderRadius}
+                      onChange={(e) => onUpdate({ borderRadius: Number(e.target.value) })}
                       className="studio-slider"
                     />
                   </div>
                 </div>
+
                 <div>
-                  <div className="flex items-center justify-between text-[11px] text-zinc-400 mb-1">
-                    <span>Roll Z</span>
-                    <span className="font-mono-tabular text-zinc-300">{state.rotateZ}°</span>
-                  </div>
-                  <input
-                    type="range"
-                    min={-15}
-                    max={15}
-                    value={state.rotateZ}
-                    onChange={(e) => onUpdate({ rotateZ: Number(e.target.value) })}
-                    className="studio-slider"
-                  />
-                </div>
-              </div>
-            )}
-
-            <div className="h-px bg-[#1E1E24] my-3" />
-
-            {/* CSS Animation Sequence */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-1.5 text-xs font-semibold text-zinc-200">
-                  <Sparkles className="w-3.5 h-3.5 text-[#60A5FA]" />
-                  CSS Animation Sequence
-                </span>
-                <span className="text-[10px] font-mono-tabular text-zinc-500">4s MP4 ready</span>
-              </div>
-              <div className="grid grid-cols-3 gap-1">
-                {(
-                  [
-                    { id: "tilt-orbit", label: "3D Sway" },
-                    { id: "entrance-rise", label: "Rise In" },
-                    { id: "float-hover", label: "Float" },
-                    { id: "spring-pop", label: "Spring" },
-                    { id: "none", label: "Static" },
-                  ] as { id: StudioCssAnimation; label: string }[]
-                ).map((anim) => {
-                  const active = (state.cssAnimation ?? "tilt-orbit") === anim.id;
-                  return (
-                    <button
-                      key={anim.id}
-                      type="button"
-                      onClick={() => onUpdate({ cssAnimation: anim.id })}
-                      className={`py-1.5 px-1 rounded-md text-[10.5px] font-medium border transition-colors whitespace-nowrap cursor-pointer ${
-                        active
-                          ? "bg-[#2563EB]/20 border-[#3B82F6] text-white"
-                          : "bg-[#141419] border-[#22222A] text-zinc-400 hover:text-zinc-200"
-                      }`}
-                    >
-                      {anim.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="h-px bg-[#1E1E24] my-3" />
-
-            {/* 5. Spotlight Magnifier & Callout Pin */}
-            <div className="space-y-2.5">
-              <label className="flex items-center justify-between text-xs font-semibold text-zinc-200 cursor-pointer">
-                <span>Spotlight Zoom Loupe</span>
-                <input
-                  type="checkbox"
-                  checked={Boolean(state.loupeEnabled)}
-                  onChange={(e) =>
-                    onUpdate({
-                      loupeEnabled: e.target.checked,
-                      loupeX: state.loupeX ?? 0.58,
-                      loupeY: state.loupeY ?? 0.42,
-                      loupeLabel:
-                        state.loupeLabel !== undefined ? state.loupeLabel : "⚡ Key Feature",
-                    })
-                  }
-                  className="accent-[#2563EB] cursor-pointer"
-                />
-              </label>
-
-              {state.loupeEnabled && (
-                <div className="space-y-2">
-                  <p className="text-[10.5px] text-zinc-400">
-                    Click anywhere on your screenshot canvas to reposition the spotlight & 2× lens.
-                  </p>
-                  <input
-                    type="text"
-                    value={state.loupeLabel ?? ""}
-                    onChange={(e) => onUpdate({ loupeLabel: e.target.value })}
-                    placeholder="Optional callout badge text"
-                    className="w-full px-2.5 py-1.5 rounded-md bg-[#16161C] border border-[#24242E] text-xs text-zinc-100 placeholder-zinc-500"
-                  />
-                  <div className="flex flex-wrap gap-1">
-                    {["⚡ Key Feature", "+340% ROI", "★ 4.9 Rated", ""].map((chip, idx) => (
+                  <span className="block text-[11px] text-zinc-400 mb-1.5">Shadow</span>
+                  <div className="grid grid-cols-4 gap-1">
+                    {(["none", "soft", "elevated", "dramatic"] as ShadowLevel[]).map((lvl) => (
                       <button
-                        key={idx}
+                        key={lvl}
                         type="button"
-                        onClick={() => onUpdate({ loupeLabel: chip })}
-                        className="px-1.5 py-0.5 rounded bg-[#16161C] hover:bg-[#22222C] border border-[#262632] text-[10px] text-zinc-300 cursor-pointer"
+                        onClick={() => onUpdate({ shadow: lvl })}
+                        className={`py-1.5 rounded-md text-[11px] font-medium capitalize border transition-colors whitespace-nowrap cursor-pointer ${
+                          state.shadow === lvl
+                            ? "bg-[#2563EB]/15 border-[#3B82F6]/60 text-white"
+                            : "bg-[#141419] border-[#22222A] text-zinc-400 hover:text-zinc-200"
+                        }`}
                       >
-                        {chip || "No Label"}
+                        {lvl}
                       </button>
                     ))}
                   </div>
                 </div>
-              )}
-            </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowFineTilt((v) => !v)}
+                  className="w-full flex items-center justify-between text-[11px] text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
+                >
+                  <span>Manual 3D Tilt (X / Y / Z)</span>
+                  <ChevronDown
+                    className={`w-3.5 h-3.5 transition-transform ${showFineTilt ? "rotate-180" : ""}`}
+                  />
+                </button>
+
+                {showFineTilt && (
+                  <div className="space-y-2.5">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <div className="flex items-center justify-between text-[11px] text-zinc-400 mb-1">
+                          <span>Tilt X</span>
+                          <span className="font-mono-tabular text-zinc-300">{state.rotateX}°</span>
+                        </div>
+                        <input
+                          type="range"
+                          min={-25}
+                          max={25}
+                          value={state.rotateX}
+                          onChange={(e) => onUpdate({ rotateX: Number(e.target.value) })}
+                          className="studio-slider"
+                        />
+                      </div>
+                      <div>
+                        <div className="flex items-center justify-between text-[11px] text-zinc-400 mb-1">
+                          <span>Tilt Y</span>
+                          <span className="font-mono-tabular text-zinc-300">{state.rotateY}°</span>
+                        </div>
+                        <input
+                          type="range"
+                          min={-25}
+                          max={25}
+                          value={state.rotateY}
+                          onChange={(e) => onUpdate({ rotateY: Number(e.target.value) })}
+                          className="studio-slider"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex items-center justify-between text-[11px] text-zinc-400 mb-1">
+                        <span>Roll Z</span>
+                        <span className="font-mono-tabular text-zinc-300">{state.rotateZ}°</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={-15}
+                        max={15}
+                        value={state.rotateZ}
+                        onChange={(e) => onUpdate({ rotateZ: Number(e.target.value) })}
+                        className="studio-slider"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-2 pt-1 border-t border-[#1E1E24]">
+                  <label className="flex items-center justify-between text-xs font-medium text-zinc-200 cursor-pointer">
+                    <span>Spotlight Zoom Loupe</span>
+                    <input
+                      type="checkbox"
+                      checked={Boolean(state.loupeEnabled)}
+                      onChange={(e) =>
+                        onUpdate({
+                          loupeEnabled: e.target.checked,
+                          loupeX: state.loupeX ?? 0.58,
+                          loupeY: state.loupeY ?? 0.42,
+                          loupeLabel:
+                            state.loupeLabel !== undefined ? state.loupeLabel : "⚡ Key Feature",
+                        })
+                      }
+                      className="accent-[#2563EB] cursor-pointer"
+                    />
+                  </label>
+
+                  {state.loupeEnabled && (
+                    <div className="space-y-2">
+                      <p className="text-[10.5px] text-zinc-400">
+                        Click on your screenshot to move the spotlight lens.
+                      </p>
+                      <input
+                        type="text"
+                        value={state.loupeLabel ?? ""}
+                        onChange={(e) => onUpdate({ loupeLabel: e.target.value })}
+                        placeholder="Optional callout badge text"
+                        className="w-full px-2.5 py-1.5 rounded-md bg-[#16161C] border border-[#24242E] text-xs text-zinc-100 placeholder-zinc-500"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </section>
         )}
       </div>
 
-      {/* Export Controls Footer (bottom safe clearance for host preview badges) */}
-      <div className="p-4 pb-20 border-t border-[#1E1E24] bg-[#0D0D11] space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-1 p-0.5 rounded-md bg-[#16161C] border border-[#24242E]">
-            {([1, 2, 3] as ExportScale[]).map((sc) => (
-              <button
-                key={sc}
-                type="button"
-                onClick={() => onUpdate({ exportScale: sc })}
-                className={`px-2.5 py-1 rounded text-[11px] font-mono-tabular font-medium transition-colors cursor-pointer ${
-                  state.exportScale === sc
-                    ? "bg-[#2563EB] text-white"
-                    : "text-zinc-400 hover:text-zinc-200"
-                }`}
-                title={`${sc}x Resolution`}
-              >
-                {sc}x
-              </button>
-            ))}
-          </div>
-
-          <div className="flex items-center gap-1 p-0.5 rounded-md bg-[#16161C] border border-[#24242E]">
-            {(["png", "jpeg"] as ExportFormat[]).map((fmt) => (
-              <button
-                key={fmt}
-                type="button"
-                onClick={() => onUpdate({ exportFormat: fmt })}
-                className={`px-2.5 py-1 rounded text-[11px] font-mono-tabular uppercase font-medium transition-colors cursor-pointer ${
-                  state.exportFormat === fmt
-                    ? "bg-[#262630] text-white"
-                    : "text-zinc-400 hover:text-zinc-200"
-                }`}
-              >
-                {fmt}
-              </button>
-            ))}
-          </div>
+      {/* Calm Export Controls Footer (bottom safe clearance for host preview badges) */}
+      <div className="p-4 pb-20 border-t border-[#1E1E24] bg-[#0D0D11] space-y-2.5">
+        <div className="flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => setShowExportOpts((v) => !v)}
+            className="flex items-center gap-1.5 text-[11px] font-medium text-zinc-400 hover:text-zinc-200 cursor-pointer"
+          >
+            <span>
+              Quality: {state.exportScale}x · {state.exportFormat.toUpperCase()}
+            </span>
+            <ChevronDown
+              className={`w-3 h-3 transition-transform ${showExportOpts ? "rotate-180" : ""}`}
+            />
+          </button>
+          <button
+            type="button"
+            disabled={isExporting || mp4Progress !== null}
+            onClick={onExportCopy}
+            className="flex items-center gap-1 text-[11px] font-medium text-zinc-300 hover:text-white disabled:opacity-50 cursor-pointer"
+          >
+            {copiedSuccess ? (
+              <>
+                <Check className="w-3 h-3 text-emerald-400" />
+                Copied
+              </>
+            ) : (
+              <>
+                <Copy className="w-3 h-3 text-zinc-400" />
+                Copy Image
+              </>
+            )}
+          </button>
         </div>
+
+        {showExportOpts && (
+          <div className="flex items-center justify-between gap-2 pb-1">
+            <div className="flex items-center gap-1 p-0.5 rounded-md bg-[#16161C] border border-[#24242E]">
+              {([1, 2, 3] as ExportScale[]).map((sc) => (
+                <button
+                  key={sc}
+                  type="button"
+                  onClick={() => onUpdate({ exportScale: sc })}
+                  className={`px-2.5 py-1 rounded text-[11px] font-mono-tabular font-medium transition-colors cursor-pointer ${
+                    state.exportScale === sc
+                      ? "bg-[#2563EB] text-white"
+                      : "text-zinc-400 hover:text-zinc-200"
+                  }`}
+                >
+                  {sc}x
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-1 p-0.5 rounded-md bg-[#16161C] border border-[#24242E]">
+              {(["png", "jpeg"] as ExportFormat[]).map((fmt) => (
+                <button
+                  key={fmt}
+                  type="button"
+                  onClick={() => onUpdate({ exportFormat: fmt })}
+                  className={`px-2.5 py-1 rounded text-[11px] font-mono-tabular uppercase font-medium transition-colors cursor-pointer ${
+                    state.exportFormat === fmt
+                      ? "bg-[#262630] text-white"
+                      : "text-zinc-400 hover:text-zinc-200"
+                  }`}
+                >
+                  {fmt}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-2">
           <button
             type="button"
             disabled={isExporting || mp4Progress !== null}
-            onClick={onExportCopy}
-            className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg bg-[#181820] hover:bg-[#22222D] border border-[#2A2A35] text-xs font-medium text-zinc-100 transition-colors disabled:opacity-50 whitespace-nowrap cursor-pointer"
+            onClick={onExportDownload}
+            className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg bg-[#2563EB] hover:bg-[#1D4ED8] text-xs font-semibold text-white transition-colors disabled:opacity-50 whitespace-nowrap cursor-pointer"
           >
-            {copiedSuccess ? (
-              <>
-                <Check className="w-3.5 h-3.5 text-emerald-400" />
-                Copied
-              </>
-            ) : (
-              <>
-                <Copy className="w-3.5 h-3.5 text-zinc-400" />
-                Copy PNG
-              </>
-            )}
+            <Download className="w-3.5 h-3.5" />
+            {isExporting && mp4Progress === null ? "Saving..." : `Save ${state.exportFormat.toUpperCase()}`}
           </button>
 
           <button
             type="button"
             disabled={isExporting || mp4Progress !== null}
-            onClick={onExportDownload}
-            className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg bg-[#F4F4F6] hover:bg-white text-xs font-semibold text-[#0A0A0C] transition-colors disabled:opacity-50 whitespace-nowrap cursor-pointer"
+            onClick={onExportMp4}
+            className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg bg-[#181820] hover:bg-[#22222D] border border-[#2A2A35] text-xs font-semibold text-zinc-100 transition-colors disabled:opacity-60 whitespace-nowrap cursor-pointer"
           >
-            <Download className="w-3.5 h-3.5" />
-            {isExporting && mp4Progress === null ? "Rendering..." : "Download"}
+            <Video className="w-3.5 h-3.5 text-[#60A5FA]" />
+            {mp4Progress !== null ? `${mp4Progress}%...` : "Save MP4"}
           </button>
         </div>
-
-        <button
-          type="button"
-          disabled={isExporting || mp4Progress !== null}
-          onClick={onExportMp4}
-          className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg bg-[#2563EB] hover:bg-[#1D4ED8] text-xs font-semibold text-white transition-colors disabled:opacity-60 whitespace-nowrap cursor-pointer"
-        >
-          <Video className="w-3.5 h-3.5" />
-          {mp4Progress !== null ? `Recording MP4 (${mp4Progress}%)...` : "Export Short MP4 (4s)"}
-        </button>
       </div>
     </aside>
   );
 };
+
