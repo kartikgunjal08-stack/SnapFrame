@@ -22,7 +22,14 @@ import {
   Smartphone,
   Eye,
   EyeOff,
+  Shuffle,
+  Copy,
+  Maximize2,
+  Minimize2,
+  Lock,
+  Crop,
 } from "lucide-react";
+import { ImageCropModal } from "./ImageCropModal";
 import { SAMPLE_MOCKUPS } from "../data/presets";
 import { SHORT_FILM_CATEGORIES, SHORT_FILM_PRESETS } from "../data/shortFilmPresets";
 import {
@@ -30,6 +37,7 @@ import {
   BrandKit,
   FilmLookConfig,
   MotionAspectId,
+  PhoneFitMode,
   SavedBrandDealProfile,
   ShortFilmCategory,
   ShortFilmDuration,
@@ -52,6 +60,8 @@ interface ShortFilmStudioViewProps {
   onChangeShots: React.Dispatch<React.SetStateAction<ShortFilmShot[]>>;
   onOpenBrandKit: () => void;
   onNotify: (msg: string, type?: "info" | "error") => void;
+  isPreviewLocked?: boolean;
+  onRequireAuthForUpload?: () => void;
 }
 
 type FilmAspect = Exclude<MotionAspectId, "4:5">;
@@ -105,6 +115,57 @@ export function createDefaultShortFilmShots(): ShortFilmShot[] {
   ];
 }
 
+const DEAL_SCRIPT_PACKS: { label: string; script: Omit<BrandDealScript, "clientName" | "ctaUrl"> }[] = [
+  {
+    label: "SaaS",
+    script: {
+      problemHook: "Static decks don't close software deals.",
+      heroHeadline: "Turn every workflow into measurable ROI.",
+      proofStat1: "10x Faster Setup",
+      proofStat2: "+340% Conversion",
+      proofStat3: "50K+ Teams",
+      offerBadge: "FOUNDING OFFER · 30% OFF",
+      ctaSubtitle: "Book a live walkthrough in 60 seconds.",
+    },
+  },
+  {
+    label: "Mobile App",
+    script: {
+      problemHook: "Slow apps lose users in 3 seconds.",
+      heroHeadline: "Your entire pocket workflow, reimagined.",
+      proofStat1: "4.9★ App Store",
+      proofStat2: "2M+ Downloads",
+      proofStat3: "0.2s Sync",
+      offerBadge: "FREE ON IOS & ANDROID",
+      ctaSubtitle: "Download now and claim 14 days Pro free.",
+    },
+  },
+  {
+    label: "AI Tool",
+    script: {
+      problemHook: "Stop burning 10 hours on manual work.",
+      heroHeadline: "Automate research, drafts & ops in 1 click.",
+      proofStat1: "14 hrs Saved/Wk",
+      proofStat2: "99.4% Accuracy",
+      proofStat3: "Zero Code",
+      offerBadge: "TRY FREE · NO CARD NEEDED",
+      ctaSubtitle: "Launch your first AI workflow today.",
+    },
+  },
+  {
+    label: "Agency",
+    script: {
+      problemHook: "Generic creatives kill paid ad ROAS.",
+      heroHeadline: "High-converting launches shipped in 48h.",
+      proofStat1: "4.2x Avg ROAS",
+      proofStat2: "120+ Brands",
+      proofStat3: "48h Delivery",
+      offerBadge: "Q4 AUDIT · LIMITED SLOTS",
+      ctaSubtitle: "Reply or visit below for a free creative audit.",
+    },
+  },
+];
+
 function loadSavedProfiles(): SavedBrandDealProfile[] {
   try {
     const raw = window.localStorage.getItem(PROFILES_STORAGE_KEY);
@@ -122,6 +183,8 @@ export const ShortFilmStudioView: React.FC<ShortFilmStudioViewProps> = ({
   onChangeShots,
   onOpenBrandKit,
   onNotify,
+  isPreviewLocked = false,
+  onRequireAuthForUpload,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const multiUploadRef = useRef<HTMLInputElement | null>(null);
@@ -135,6 +198,7 @@ export const ShortFilmStudioView: React.FC<ShortFilmStudioViewProps> = ({
 
   const [aspectId, setAspectId] = useState<FilmAspect>("16:9");
   const [phoneFormatMode, setPhoneFormatMode] = useState(false);
+  const [phoneFitMode, setPhoneFitMode] = useState<PhoneFitMode>("showcase");
   const [mockupScale, setMockupScale] = useState(100);
   const [showBrandHeader, setShowBrandHeader] = useState(true);
   const [duration, setDuration] = useState<ShortFilmDuration>(SHORT_FILM_PRESETS[0].defaultDuration);
@@ -174,6 +238,17 @@ export const ShortFilmStudioView: React.FC<ShortFilmStudioViewProps> = ({
   const currentTimeRef = useRef(0);
   const startClockRef = useRef(0);
   const rafRef = useRef<number | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [cropShotIndex, setCropShotIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsFullscreen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isFullscreen]);
 
   const [audioEnabled, setAudioEnabled] = useState(false);
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -275,6 +350,7 @@ export const ShortFilmStudioView: React.FC<ShortFilmStudioViewProps> = ({
         useBrandKit,
         mockupScale,
         showBrandHeader,
+        phoneFitMode,
       });
     },
     [
@@ -286,6 +362,7 @@ export const ShortFilmStudioView: React.FC<ShortFilmStudioViewProps> = ({
       effectivePreset,
       filmLook,
       mockupScale,
+      phoneFitMode,
       shots,
       showBrandHeader,
       useBrandKit,
@@ -444,6 +521,10 @@ export const ShortFilmStudioView: React.FC<ShortFilmStudioViewProps> = ({
 
   const handleMultiFileUpload = (files: FileList | null) => {
     if (!files || files.length === 0) return;
+    if (isPreviewLocked && onRequireAuthForUpload) {
+      onRequireAuthForUpload();
+      return;
+    }
     const imageFiles = Array.from(files).filter((f) => f.type.startsWith("image/"));
     if (imageFiles.length === 0) return;
 
@@ -652,6 +733,7 @@ export const ShortFilmStudioView: React.FC<ShortFilmStudioViewProps> = ({
         useBrandKit,
         mockupScale,
         showBrandHeader,
+        phoneFitMode,
       });
       frames.push(offCtx.getImageData(0, 0, gw, gh));
       setExportState({
@@ -684,8 +766,8 @@ export const ShortFilmStudioView: React.FC<ShortFilmStudioViewProps> = ({
       onDrop={handleDrop}
       onDragOver={(e) => e.preventDefault()}
     >
-      {/* Left Rail: Clean Commercial Templates List */}
-      <aside className="w-full lg:w-[272px] shrink-0 border-b lg:border-b-0 lg:border-r border-[#1E1E24] bg-[#101014] flex flex-col min-h-0">
+      {/* Left Rail: Clean Commercial Templates List (shows below canvas on phones) */}
+      <aside className="order-2 lg:order-1 w-full lg:w-[272px] shrink-0 max-h-[250px] sm:max-h-[300px] lg:max-h-none border-t lg:border-t-0 lg:border-r border-[#1E1E24] bg-[#101014] flex flex-col min-h-0">
         <div className="p-3.5 border-b border-[#1E1E24] space-y-2.5">
           <div className="flex items-center justify-between">
             <h2 className="text-xs font-semibold text-white">
@@ -741,9 +823,20 @@ export const ShortFilmStudioView: React.FC<ShortFilmStudioViewProps> = ({
                 }`}
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-semibold text-zinc-100 truncate">
-                    {item.name}
-                  </span>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="flex items-center -space-x-1 shrink-0">
+                      {item.palette.slice(0, 3).map((hex, i) => (
+                        <span
+                          key={i}
+                          className="w-2.5 h-2.5 rounded-full border border-black/60"
+                          style={{ backgroundColor: hex }}
+                        />
+                      ))}
+                    </span>
+                    <span className="text-xs font-semibold text-zinc-100 truncate">
+                      {item.name}
+                    </span>
+                  </div>
                   <span className="text-[10px] font-mono-tabular text-zinc-400 shrink-0">
                     {item.defaultDuration}s
                   </span>
@@ -757,9 +850,15 @@ export const ShortFilmStudioView: React.FC<ShortFilmStudioViewProps> = ({
         </div>
       </aside>
 
-      {/* Center Stage: Cinema Preview + Chapters + Storyboard */}
-      <section className="flex-1 flex flex-col min-w-0 studio-canvas-grid overflow-hidden">
-        <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 border-b border-[#1E1E24] bg-[#0D0D10]/90">
+      {/* Center Stage: Cinema Preview + Chapters + Storyboard (first on phones) */}
+      <section
+        className={
+          isFullscreen
+            ? "fixed inset-0 z-50 flex flex-col bg-[#060608] overflow-hidden"
+            : "order-1 lg:order-2 flex-1 flex flex-col min-w-0 studio-canvas-grid lg:overflow-hidden"
+        }
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2 sm:py-2.5 border-b border-[#1E1E24] bg-[#0D0D10]/90">
           <div className="flex items-center gap-2 text-xs text-zinc-400 min-w-0">
             <Sparkles className="w-3.5 h-3.5 text-[#60A5FA] shrink-0" />
             <span className="font-semibold text-zinc-100 truncate">{preset.name}</span>
@@ -801,6 +900,22 @@ export const ShortFilmStudioView: React.FC<ShortFilmStudioViewProps> = ({
             <button
               type="button"
               disabled={exportState.active}
+              onClick={() => {
+                const pool = filteredPresets.length > 1 ? filteredPresets : SHORT_FILM_PRESETS;
+                const candidates = pool.filter((p) => p.id !== preset.id);
+                const next = candidates[Math.floor(Math.random() * candidates.length)] || SHORT_FILM_PRESETS[0];
+                applyPreset(next);
+                onNotify(`Remixed film cut to "${next.name}"`);
+              }}
+              title="Pick a fresh eye-catching Film Cut"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-[#18181F] hover:bg-[#22222C] border border-[#282834] text-xs font-medium text-zinc-200 cursor-pointer whitespace-nowrap"
+            >
+              <Shuffle className="w-3.5 h-3.5 text-[#60A5FA]" />
+              Remix
+            </button>
+            <button
+              type="button"
+              disabled={exportState.active}
               onClick={togglePhoneFormat}
               title="Convert current template to vertical Phone Format (9:16 iPhone)"
               className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium border cursor-pointer whitespace-nowrap transition-colors ${
@@ -812,38 +927,81 @@ export const ShortFilmStudioView: React.FC<ShortFilmStudioViewProps> = ({
               <Smartphone className="w-3.5 h-3.5 text-[#60A5FA]" />
               Phone Format
             </button>
+            {!isFullscreen && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isPreviewLocked && onRequireAuthForUpload) {
+                      onRequireAuthForUpload();
+                      return;
+                    }
+                    multiUploadRef.current?.click();
+                  }}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-[#2563EB] hover:bg-[#1D4ED8] text-xs font-semibold text-white cursor-pointer whitespace-nowrap"
+                >
+                  {isPreviewLocked ? <Lock className="w-3.5 h-3.5" /> : <Upload className="w-3.5 h-3.5" />}
+                  {isPreviewLocked ? "Add Screenshots (Sign In)" : "Add Screenshots"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCropShotIndex(activeShotIndex)}
+                  title="Crop current storyboard shot so it fits cleanly inside the frame"
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-[#18181F] hover:bg-[#22222C] border border-[#282834] text-xs font-medium text-zinc-200 cursor-pointer whitespace-nowrap"
+                >
+                  <Crop className="w-3.5 h-3.5 text-[#60A5FA]" />
+                  Crop Shot
+                </button>
+                <button
+                  type="button"
+                  onClick={onOpenBrandKit}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-[#18181F] hover:bg-[#22222C] border border-[#282834] text-xs font-medium text-zinc-200 cursor-pointer whitespace-nowrap"
+                >
+                  <Palette className="w-3.5 h-3.5" style={{ color: brandKit.primaryColor }} />
+                  Brand Kit
+                </button>
+              </>
+            )}
             <button
               type="button"
-              onClick={() => multiUploadRef.current?.click()}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-[#2563EB] hover:bg-[#1D4ED8] text-xs font-semibold text-white cursor-pointer whitespace-nowrap"
+              onClick={() => setIsFullscreen((f) => !f)}
+              title={isFullscreen ? "Exit Fullscreen Preview (Esc)" : "Fullscreen Preview"}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs font-medium cursor-pointer whitespace-nowrap transition-colors ${
+                isFullscreen
+                  ? "bg-[#2563EB] border-[#3B82F6] text-white"
+                  : "bg-[#18181F] hover:bg-[#22222C] border-[#282834] text-zinc-200"
+              }`}
             >
-              <Upload className="w-3.5 h-3.5" />
-              Add Screenshots
-            </button>
-            <button
-              type="button"
-              onClick={onOpenBrandKit}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-[#18181F] hover:bg-[#22222C] border border-[#282834] text-xs font-medium text-zinc-200 cursor-pointer whitespace-nowrap"
-            >
-              <Palette className="w-3.5 h-3.5" style={{ color: brandKit.primaryColor }} />
-              Brand Kit
+              {isFullscreen ? (
+                <>
+                  <Minimize2 className="w-3.5 h-3.5" />
+                  Exit Fullscreen
+                </>
+              ) : (
+                <>
+                  <Maximize2 className="w-3.5 h-3.5 text-[#60A5FA]" />
+                  Fullscreen
+                </>
+              )}
             </button>
           </div>
         </div>
 
         {/* Canvas Viewport */}
-        <div className="flex-1 flex items-center justify-center p-4 overflow-auto studio-scroll">
+        <div className="flex-1 flex items-center justify-center p-2.5 sm:p-4 overflow-auto studio-scroll">
           <canvas
             ref={canvasRef}
             width={dims.width}
             height={dims.height}
-            className="max-w-full max-h-[380px] w-auto h-auto rounded-lg border border-white/10 shadow-2xl bg-[#07080C]"
+            className={`max-w-full w-auto h-auto rounded-lg border border-white/10 shadow-2xl bg-[#07080C] ${
+              isFullscreen ? "max-h-[76vh] sm:max-h-[80vh]" : "max-h-[44vh] sm:max-h-[380px]"
+            }`}
           />
         </div>
 
         {/* Transport & Chapter Jump Strip */}
-        <div className="px-4 py-2 border-t border-[#1E1E24] bg-[#0D0D11] space-y-2">
-          <div className="flex items-center gap-2.5">
+        <div className="px-3 sm:px-4 py-2 border-t border-[#1E1E24] bg-[#0D0D11] space-y-2">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
             <button
               type="button"
               disabled={exportState.active}
@@ -915,9 +1073,9 @@ export const ShortFilmStudioView: React.FC<ShortFilmStudioViewProps> = ({
                 currentTimeRef.current = v;
                 setCurrentTime(v);
               }}
-              className="studio-slider flex-1"
+              className="studio-slider flex-1 min-w-[110px]"
             />
-            <span className="text-[11px] font-mono-tabular text-zinc-300 w-24 text-right shrink-0">
+            <span className="text-[11px] font-mono-tabular text-zinc-300 w-20 sm:w-24 text-right shrink-0">
               {currentTime.toFixed(1)}s / {duration}s
             </span>
           </div>
@@ -944,18 +1102,25 @@ export const ShortFilmStudioView: React.FC<ShortFilmStudioViewProps> = ({
         </div>
 
         {/* Multi-Screenshot Storyboard Tray */}
+        {!isFullscreen && (
         <div className="p-3 border-t border-[#1E1E24] bg-[#0B0B0E] space-y-2">
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-[11px] font-semibold text-zinc-300">
               2. Storyboard Shots ({shots.length}) — Click a shot to edit focus & caption
             </span>
             <button
               type="button"
-              onClick={() => multiUploadRef.current?.click()}
+              onClick={() => {
+                if (isPreviewLocked && onRequireAuthForUpload) {
+                  onRequireAuthForUpload();
+                  return;
+                }
+                multiUploadRef.current?.click();
+              }}
               className="flex items-center gap-1 text-[11px] text-[#60A5FA] hover:text-white cursor-pointer"
             >
-              <Plus className="w-3 h-3" />
-              Add Shot
+              {isPreviewLocked ? <Lock className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
+              {isPreviewLocked ? "Add Shot (Sign In)" : "Add Shot"}
             </button>
           </div>
 
@@ -1017,6 +1182,38 @@ export const ShortFilmStudioView: React.FC<ShortFilmStudioViewProps> = ({
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
+                          setCropShotIndex(idx);
+                        }}
+                        className="p-0.5 text-zinc-400 hover:text-[#60A5FA] cursor-pointer"
+                        title="Crop & Auto-Fit shot"
+                      >
+                        <Crop className="w-3 h-3" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const copyShot: ShortFilmShot = {
+                            ...shot,
+                            id: `shot-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+                            label: `${shot.label} Copy`,
+                          };
+                          onChangeShots((prev) => [
+                            ...prev.slice(0, idx + 1),
+                            copyShot,
+                            ...prev.slice(idx + 1),
+                          ]);
+                          setActiveShotIndex(idx + 1);
+                        }}
+                        className="p-0.5 text-zinc-400 hover:text-[#60A5FA] cursor-pointer"
+                        title="Duplicate shot"
+                      >
+                        <Copy className="w-3 h-3" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
                           removeShot(idx);
                         }}
                         className="p-0.5 text-zinc-500 hover:text-red-400 cursor-pointer"
@@ -1031,10 +1228,11 @@ export const ShortFilmStudioView: React.FC<ShortFilmStudioViewProps> = ({
             })}
           </div>
         </div>
+        )}
       </section>
 
       {/* Right Rail: Clean 3-Tab Inspector + Pinned Export */}
-      <aside className="w-full lg:w-[296px] shrink-0 border-t lg:border-t-0 lg:border-l border-[#1E1E24] bg-[#101014] flex flex-col min-h-0">
+      <aside className="order-3 w-full lg:w-[296px] shrink-0 border-t lg:border-t-0 lg:border-l border-[#1E1E24] bg-[#101014] flex flex-col min-h-0">
         {/* Clean Tab Bar */}
         <div className="p-3 border-b border-[#1E1E24] bg-[#0D0D11]">
           <div className="grid grid-cols-3 gap-1 p-1 rounded-lg bg-[#16161C] border border-[#24242E]">
@@ -1130,6 +1328,28 @@ export const ShortFilmStudioView: React.FC<ShortFilmStudioViewProps> = ({
                   >
                     Sync Brand Kit
                   </button>
+                </div>
+
+                <div>
+                  <span className="block text-[10px] text-zinc-400 mb-1">1-Click Industry Script</span>
+                  <div className="grid grid-cols-4 gap-1">
+                    {DEAL_SCRIPT_PACKS.map((pack) => (
+                      <button
+                        key={pack.label}
+                        type="button"
+                        onClick={() => {
+                          setDealScript((prev) => ({
+                            ...prev,
+                            ...pack.script,
+                          }));
+                          onNotify(`Loaded ${pack.label} commercial script`);
+                        }}
+                        className="py-1 rounded bg-[#16161C] hover:bg-[#22222C] border border-[#262632] text-[10px] font-medium text-zinc-200 cursor-pointer"
+                      >
+                        {pack.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 <div>
@@ -1284,13 +1504,45 @@ export const ShortFilmStudioView: React.FC<ShortFilmStudioViewProps> = ({
                   <input
                     type="range"
                     min={55}
-                    max={140}
+                    max={145}
                     value={mockupScale}
                     disabled={exportState.active}
                     onChange={(e) => setMockupScale(Number(e.target.value))}
                     className="studio-slider w-full"
                   />
                 </div>
+
+                {(phoneFormatMode || effectivePreset.frameStyle === "iphone") && (
+                  <div className="space-y-1.5 pt-2.5">
+                    <div className="flex items-center justify-between text-[11px] text-zinc-300">
+                      <span className="font-semibold">Desktop SS in Phone</span>
+                      <span className="text-[10px] text-zinc-500">Wide Fix</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-1">
+                      {(
+                        [
+                          { id: "showcase", label: "Pop-Out" },
+                          { id: "fit", label: "Full Card" },
+                          { id: "pan", label: "Fill & Pan" },
+                        ] as { id: PhoneFitMode; label: string }[]
+                      ).map((opt) => (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          disabled={exportState.active}
+                          onClick={() => setPhoneFitMode(opt.id)}
+                          className={`py-1.5 px-1 rounded-md text-[10.5px] font-medium border cursor-pointer whitespace-nowrap transition-colors ${
+                            phoneFitMode === opt.id
+                              ? "bg-[#2563EB]/20 border-[#3B82F6] text-white"
+                              : "bg-[#141419] border-[#22222A] text-zinc-400 hover:text-zinc-200"
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="h-px bg-[#1E1E24]" />
@@ -1411,7 +1663,41 @@ export const ShortFilmStudioView: React.FC<ShortFilmStudioViewProps> = ({
 
               {/* Compact Commercial & Cinema FX */}
               <div className="space-y-1.5">
-                <h3 className="text-xs font-semibold text-zinc-200 mb-1">Cinema FX</h3>
+                <div className="flex items-center justify-between mb-1">
+                  <h3 className="text-xs font-semibold text-zinc-200">Cinema FX</h3>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCinemaBars(false);
+                        setMotionBlurTrails(false);
+                        setFlashBeats(false);
+                        setChromaticSplit(false);
+                        setParticlesEnabled(false);
+                      }}
+                      className="px-1.5 py-0.5 rounded bg-[#16161C] hover:bg-[#22222C] border border-[#262632] text-[10px] text-zinc-300 cursor-pointer"
+                    >
+                      Clean
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCommercialArc(true);
+                        setCursorSpotlight(true);
+                        setParticlesEnabled(true);
+                        setCinemaBars(true);
+                        setMotionBlurTrails(true);
+                        setFlashBeats(true);
+                        setChromaticSplit(true);
+                        setFloorReflection(true);
+                        setKineticText(true);
+                      }}
+                      className="px-1.5 py-0.5 rounded bg-[#2563EB]/20 hover:bg-[#2563EB]/30 border border-[#3B82F6]/50 text-[10px] text-blue-200 cursor-pointer"
+                    >
+                      Full FX
+                    </button>
+                  </div>
+                </div>
                 {[
                   { label: "Brand & URL Headings", val: showBrandHeader, set: setShowBrandHeader },
                   { label: "6-Act Commercial Story", val: commercialArc, set: setCommercialArc },
@@ -1444,25 +1730,35 @@ export const ShortFilmStudioView: React.FC<ShortFilmStudioViewProps> = ({
 
           {inspectorTab === "shot" && activeShot && (
             <div className="space-y-3.5">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <h3 className="text-xs font-semibold text-zinc-200">
                   Shot 0{activeShotIndex + 1} Settings
                 </h3>
-                {(activeShot.focusX !== undefined || activeShot.focusY !== undefined) && (
+                <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() =>
-                      onChangeShots((prev) =>
-                        prev.map((s, i) =>
-                          i === activeShotIndex ? { ...s, focusX: undefined, focusY: undefined } : s
-                        )
-                      )
-                    }
-                    className="text-[10px] text-zinc-400 hover:text-white cursor-pointer"
+                    onClick={() => setCropShotIndex(activeShotIndex)}
+                    className="flex items-center gap-1 px-2 py-1 rounded bg-[#181820] hover:bg-[#22222C] border border-[#282834] text-[10px] font-medium text-[#60A5FA] cursor-pointer"
                   >
-                    Center Focus
+                    <Crop className="w-3 h-3" />
+                    Crop Shot
                   </button>
-                )}
+                  {(activeShot.focusX !== undefined || activeShot.focusY !== undefined) && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onChangeShots((prev) =>
+                          prev.map((s, i) =>
+                            i === activeShotIndex ? { ...s, focusX: undefined, focusY: undefined } : s
+                          )
+                        )
+                      }
+                      className="text-[10px] text-zinc-400 hover:text-white cursor-pointer"
+                    >
+                      Center Focus
+                    </button>
+                  )}
+                </div>
               </div>
 
               <div>
@@ -1543,8 +1839,8 @@ export const ShortFilmStudioView: React.FC<ShortFilmStudioViewProps> = ({
           )}
         </div>
 
-        {/* Pinned Export Footer */}
-        <div className="p-3.5 border-t border-[#1E1E24] bg-[#0D0D11] space-y-2 shrink-0">
+        {/* Pinned Export Footer (bottom safe clearance for host preview badges) */}
+        <div className="p-3.5 pb-20 border-t border-[#1E1E24] bg-[#0D0D11] space-y-2 shrink-0">
           {exportState.active ? (
             <button
               type="button"
@@ -1593,6 +1889,39 @@ export const ShortFilmStudioView: React.FC<ShortFilmStudioViewProps> = ({
           )}
         </div>
       </aside>
+
+      <ImageCropModal
+        open={cropShotIndex !== null && Boolean(shots[cropShotIndex])}
+        imageSrc={
+          cropShotIndex !== null && shots[cropShotIndex] ? shots[cropShotIndex].imageSrc : ""
+        }
+        title={
+          cropShotIndex !== null
+            ? `Crop & Auto-Fit Shot 0${cropShotIndex + 1}`
+            : "Crop & Auto-Fit Shot"
+        }
+        targetFrameAspect={
+          phoneFormatMode || effectivePreset.frameStyle === "iphone" ? 0.5 : 16 / 10
+        }
+        targetFrameLabel={
+          phoneFormatMode || effectivePreset.frameStyle === "iphone" ? "iPhone" : "Frame"
+        }
+        onApplyCrop={(croppedUrl, croppedRatio) => {
+          if (cropShotIndex === null) return;
+          const idx = cropShotIndex;
+          onChangeShots((prev) =>
+            prev.map((s, i) =>
+              i === idx ? { ...s, imageSrc: croppedUrl, focusX: 0.5, focusY: 0.5 } : s
+            )
+          );
+          setMockupScale(100);
+          if (phoneFormatMode || effectivePreset.frameStyle === "iphone") {
+            setPhoneFitMode(croppedRatio <= 1.08 ? "pan" : "fit");
+          }
+          onNotify(`Cropped Shot 0${idx + 1} & auto-fitted into frame`);
+        }}
+        onClose={() => setCropShotIndex(null)}
+      />
     </div>
   );
 };

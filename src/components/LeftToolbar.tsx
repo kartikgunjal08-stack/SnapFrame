@@ -14,6 +14,8 @@ import {
   RotateCcw,
   Palette,
   ShieldCheck,
+  Lock,
+  Crop,
 } from "lucide-react";
 import { APP_CONFIG } from "../config";
 import { ASPECT_RATIO_OPTIONS } from "../data/presets";
@@ -29,6 +31,9 @@ interface LeftToolbarProps {
   onSelectSample: (sampleId: SampleId) => void;
   onOpenTemplates: () => void;
   onOpenBrandKit: () => void;
+  onOpenCrop: () => void;
+  isPreviewLocked?: boolean;
+  onRequireAuthForUpload?: () => void;
 }
 
 const SAMPLE_BUTTONS: {
@@ -52,6 +57,9 @@ export const LeftToolbar: React.FC<LeftToolbarProps> = ({
   onSelectSample,
   onOpenTemplates,
   onOpenBrandKit,
+  onOpenCrop,
+  isPreviewLocked = false,
+  onRequireAuthForUpload,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [sizeMode, setSizeMode] = React.useState<"standard" | "store">(() => {
@@ -140,11 +148,30 @@ export const LeftToolbar: React.FC<LeftToolbarProps> = ({
 
           <button
             type="button"
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => {
+              if (isPreviewLocked && onRequireAuthForUpload) {
+                onRequireAuthForUpload();
+                return;
+              }
+              fileInputRef.current?.click();
+            }}
             className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg bg-[#2563EB] hover:bg-[#1D4ED8] text-xs font-semibold text-white transition-colors whitespace-nowrap cursor-pointer"
           >
-            <ImagePlus className="w-4 h-4 shrink-0" />
-            Upload or Paste (Ctrl+V)
+            {isPreviewLocked ? (
+              <Lock className="w-3.5 h-3.5 shrink-0" />
+            ) : (
+              <ImagePlus className="w-4 h-4 shrink-0" />
+            )}
+            {isPreviewLocked ? "Upload Screenshot (Sign In)" : "Upload or Paste (Ctrl+V)"}
+          </button>
+
+          <button
+            type="button"
+            onClick={onOpenCrop}
+            className="w-full mt-2 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-[#16161C] hover:bg-[#1F1F28] border border-[#282834] text-xs font-medium text-zinc-200 transition-colors cursor-pointer"
+          >
+            <Crop className="w-3.5 h-3.5 text-[#60A5FA]" />
+            Crop & Auto-Fit in Frame
           </button>
 
           <div className="grid grid-cols-3 gap-1.5 mt-2.5">

@@ -8,6 +8,7 @@ import {
   Contrast,
   Grid,
   X,
+  Crop,
 } from "lucide-react";
 import {
   BackdropPattern,
@@ -74,7 +75,10 @@ interface QuickActionDockProps {
   onUpdate: (patch: Partial<StudioState>) => void;
   onUploadFile: (file: File) => void;
   onResetPosition: () => void;
+  onOpenCrop: () => void;
   onClose: () => void;
+  isPreviewLocked?: boolean;
+  onRequireAuthForUpload?: () => void;
 }
 
 export const QuickActionDock: React.FC<QuickActionDockProps> = ({
@@ -83,7 +87,10 @@ export const QuickActionDock: React.FC<QuickActionDockProps> = ({
   onUpdate,
   onUploadFile,
   onResetPosition,
+  onOpenCrop,
   onClose,
+  isPreviewLocked = false,
+  onRequireAuthForUpload,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bgInputRef = useRef<HTMLInputElement>(null);
@@ -196,6 +203,8 @@ export const QuickActionDock: React.FC<QuickActionDockProps> = ({
           onClick={() => {
             if (selectedElement === "backdrop") {
               bgInputRef.current?.click();
+            } else if (isPreviewLocked && onRequireAuthForUpload) {
+              onRequireAuthForUpload();
             } else {
               fileInputRef.current?.click();
             }
@@ -203,7 +212,11 @@ export const QuickActionDock: React.FC<QuickActionDockProps> = ({
           className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#1A1A23] hover:bg-[#232330] border border-[#2A2A36] text-xs font-medium text-zinc-100 whitespace-nowrap shrink-0 cursor-pointer"
         >
           <ImagePlus className="w-3.5 h-3.5 text-[#60A5FA]" />
-          {selectedElement === "backdrop" ? "Replace Backdrop" : "Replace Image"}
+          {selectedElement === "backdrop"
+            ? "Replace Backdrop"
+            : isPreviewLocked
+              ? "Replace Image (Sign In)"
+              : "Replace Image"}
         </button>
 
         {/* Apply Filter */}
@@ -223,6 +236,14 @@ export const QuickActionDock: React.FC<QuickActionDockProps> = ({
         {/* Context-Specific Direct Tools */}
         {selectedElement === "device" && (
           <>
+            <button
+              type="button"
+              onClick={onOpenCrop}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#1A1A23] hover:bg-[#232330] border border-[#2A2A36] text-xs font-medium text-zinc-100 whitespace-nowrap shrink-0 cursor-pointer"
+            >
+              <Crop className="w-3.5 h-3.5 text-[#60A5FA]" />
+              Crop & Fit
+            </button>
             <button
               type="button"
               onClick={handleCycleFrame}

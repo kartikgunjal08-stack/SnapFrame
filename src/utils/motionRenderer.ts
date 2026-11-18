@@ -4,6 +4,7 @@ import {
   MotionAspectId,
   MotionEasing,
   MotionPreset,
+  PhoneFitMode,
 } from "../types/studio";
 import { sanitizeHexColor } from "./brandKitStorage";
 
@@ -165,7 +166,10 @@ function drawFramedMockup(
   accentColor: string,
   shimmerPos: number | null,
   shadowScale: number,
-  showFrameHeader = true
+  showFrameHeader = true,
+  phoneFitMode: PhoneFitMode = "pan",
+  focusX = 0.5,
+  progress = 0
 ) {
   ctx.save();
   ctx.shadowColor = "rgba(0,0,0,0.62)";
@@ -259,28 +263,99 @@ function drawFramedMockup(
   ctx.fillStyle = "#090B10";
   ctx.fillRect(x, contentY, w, contentH);
 
+  const imgAspect =
+    img && img.complete && img.naturalWidth > 0 && img.naturalHeight > 0
+      ? img.naturalWidth / img.naturalHeight
+      : 16 / 10;
+  const isWideDesktopInPhone = frameStyle === "iphone" && imgAspect > 1.08;
+
   if (img && img.complete && img.naturalWidth > 0) {
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = "high";
-    const imgAspect = img.naturalWidth / img.naturalHeight;
     const boxAspect = w / contentH;
 
-    let drawW = w;
-    let drawH = contentH;
-    let dx = x;
-    let dy = contentY;
+    if (isWideDesktopInPhone) {
+      if (phoneFitMode === "pan") {
+        // Draw blurred ambient echo behind a balanced horizontal glide (avoids 3x over-zoomed distortion)
+        const bgScale = Math.max(w / img.naturalWidth, contentH / img.naturalHeight) * 1.15;
+        const bgW = img.naturalWidth * bgScale;
+        const bgH = img.naturalHeight * bgScale;
+        ctx.save();
+        if ("filter" in ctx) ctx.filter = "blur(18px)";
+        ctx.globalAlpha = 0.36;
+        ctx.drawImage(img, x + (w - bgW) / 2, contentY + (contentH - bgH) / 2, bgW, bgH);
+        ctx.restore();
 
-    if (imgAspect > boxAspect) {
-      drawW = w;
-      drawH = w / imgAspect;
-      dy = contentY + (contentH - drawH) / 2;
+        const drawH = Math.min(contentH, Math.max(w * 1.18, contentH * 0.72));
+        const drawW = Math.max(w, drawH * imgAspect);
+        const overflowX = Math.max(0, drawW - w);
+        const glideShift = Math.sin(progress * Math.PI * 2) * 0.18;
+        const panFrac = clamp01(focusX + glideShift);
+        const dx = x - overflowX * panFrac;
+        const dy = contentY + (contentH - drawH) / 2;
+        ctx.save();
+        roundRect(ctx, x + 4, dy, w - 8, drawH, 12);
+        ctx.clip();
+        ctx.drawImage(img, dx, dy, drawW, drawH);
+        ctx.restore();
+      } else {
+        // Draw rich blurred ambient echo behind the centered or pop-out desktop screenshot
+        const bgScale = Math.max(w / img.naturalWidth, contentH / img.naturalHeight) * 1.15;
+        const bgW = img.naturalWidth * bgScale;
+        const bgH = img.naturalHeight * bgScale;
+        ctx.save();
+        if ("filter" in ctx) ctx.filter = "blur(18px)";
+        ctx.globalAlpha = 0.44;
+        ctx.drawImage(img, x + (w - bgW) / 2, contentY + (contentH - bgH) / 2, bgW, bgH);
+        ctx.restore();
+
+        if (phoneFitMode === "fit") {
+          const pad = 10;
+          const drawW = w - pad * 2;
+          const drawH = drawW / imgAspect;
+          const dy = contentY + (contentH - drawH) / 2;
+          ctx.save();
+          ctx.shadowColor = "rgba(0,0,0,0.68)";
+          ctx.shadowBlur = 24;
+          roundRect(ctx, x + pad, dy, drawW, drawH, 12);
+          ctx.clip();
+          ctx.drawImage(img, x + pad, dy, drawW, drawH);
+          ctx.restore();
+
+          ctx.save();
+          roundRect(ctx, x + pad, dy, drawW, drawH, 12);
+          ctx.strokeStyle = "rgba(255,255,255,0.22)";
+          ctx.lineWidth = 1.2;
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+    } else if (frameStyle === "iphone") {
+      // Portrait / Mobile screenshot fills the iPhone screen edge-to-edge cleanly
+      const scaleCover = Math.max(w / img.naturalWidth, contentH / img.naturalHeight);
+      const drawW = img.naturalWidth * scaleCover;
+      const drawH = img.naturalHeight * scaleCover;
+      const dx = x + (w - drawW) / 2;
+      const dy = contentY + (contentH - drawH) / 2;
+      ctx.drawImage(img, dx, dy, drawW, drawH);
     } else {
-      drawH = contentH;
-      drawW = contentH * imgAspect;
-      dx = x + (w - drawW) / 2;
-    }
+      let drawW = w;
+      let drawH = contentH;
+      let dx = x;
+      let dy = contentY;
 
-    ctx.drawImage(img, dx, dy, drawW, drawH);
+      if (imgAspect > boxAspect) {
+        drawW = w;
+        drawH = w / imgAspect;
+        dy = contentY + (contentH - drawH) / 2;
+      } else {
+        drawH = contentH;
+        drawW = contentH * imgAspect;
+        dx = x + (w - drawW) / 2;
+      }
+
+      ctx.drawImage(img, dx, dy, drawW, drawH);
+    }
   } else {
     // Fallback preview skeleton
     ctx.fillStyle = accentColor;
@@ -320,6 +395,60 @@ function drawFramedMockup(
   ctx.lineWidth = frameStyle === "iphone" ? 3 : 1.5;
   ctx.stroke();
   ctx.restore();
+
+  // Pop-Out Desktop Showcase Card extending cleanly past phone edges so desktop UI is crisp & legible
+  if (
+    isWideDesktopInPhone &&
+    phoneFitMode === "showcase" &&
+    img &&
+    img.complete &&
+    img.naturalWidth > 0
+  ) {
+    const popW = w * 1.52;
+    const popBarH = showFrameHeader ? 24 : 0;
+    const popImgH = popW / imgAspect;
+    const popH = popImgH + popBarH;
+    const popX = x + (w - popW) / 2;
+    const popY = y + (h - popH) / 2;
+
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,0.78)";
+    ctx.shadowBlur = 36;
+    ctx.shadowOffsetY = 18;
+    roundRect(ctx, popX, popY, popW, popH, 14);
+    ctx.fillStyle = "#0B0D12";
+    ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    roundRect(ctx, popX, popY, popW, popH, 14);
+    ctx.clip();
+    if (showFrameHeader) {
+      ctx.fillStyle = "#171820";
+      ctx.fillRect(popX, popY, popW, popBarH);
+      ["#FF5F56", "#FFBD2E", "#27C93F"].forEach((dot, idx) => {
+        ctx.fillStyle = dot;
+        ctx.beginPath();
+        ctx.arc(popX + 14 + idx * 12, popY + popBarH / 2, 3.6, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      ctx.fillStyle = "#94A3B8";
+      ctx.font = "500 9.5px 'JetBrains Mono', monospace";
+      ctx.textAlign = "center";
+      ctx.fillText(domainLabel, popX + popW / 2, popY + 15);
+    }
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(img, popX, popY + popBarH, popW, popImgH);
+    ctx.restore();
+
+    ctx.save();
+    roundRect(ctx, popX, popY, popW, popH, 14);
+    ctx.strokeStyle = "rgba(255,255,255,0.28)";
+    ctx.lineWidth = 1.6;
+    ctx.stroke();
+    ctx.restore();
+  }
 }
 
 export interface RenderMotionFrameParams {
@@ -338,6 +467,134 @@ export interface RenderMotionFrameParams {
   useBrandKit: boolean;
   mockupScale?: number; // 55..140 percentage
   showFrameHeader?: boolean;
+  cursorSpotlight?: boolean;
+  zoomLoupe?: boolean;
+  focusX?: number; // 0..1
+  focusY?: number; // 0..1
+  floatingBadge?: string;
+  floorReflection?: boolean;
+  ambientAura?: boolean;
+  phoneFitMode?: PhoneFitMode;
+}
+
+function drawMotionCursorAndLoupe(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement | null,
+  cardX: number,
+  cardY: number,
+  cardW: number,
+  cardH: number,
+  focusX: number,
+  focusY: number,
+  progress: number,
+  accent: string,
+  showLoupe: boolean
+) {
+  // Glide cursor from bottom-right into focus target between progress 0.14..0.42
+  const glideT = evaluateEasing(clamp01((progress - 0.14) / 0.28), "expoOut");
+  const targetX = cardX + cardW * focusX;
+  const targetY = cardY + cardH * focusY;
+  const startX = cardX + cardW * 0.85;
+  const startY = cardY + cardH * 0.88;
+  const curX = startX + (targetX - startX) * glideT;
+  const curY = startY + (targetY - startY) * glideT;
+
+  // Click pulse waves at progress ~0.44 and ~0.72
+  const clickWave = (startAt: number) => {
+    const local = (progress - startAt) / 0.28;
+    if (local <= 0 || local >= 1) return;
+    const ease = evaluateEasing(local, "easeOut");
+    ctx.save();
+    ctx.strokeStyle = accent;
+    ctx.globalAlpha = (1 - local) * 0.85;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(targetX, targetY, 8 + ease * 36, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = (1 - local) * 0.25;
+    ctx.fillStyle = accent;
+    ctx.fill();
+    ctx.restore();
+  };
+  clickWave(0.42);
+  clickWave(0.7);
+
+  // Optional 1.85x circular Zoom Loupe popping in after arrival
+  if (showLoupe && img && img.complete && img.naturalWidth > 0 && progress > 0.36) {
+    const pop = evaluateEasing(clamp01((progress - 0.36) / 0.18), "spring");
+    const loupeR = Math.min(72, Math.max(44, Math.min(cardW, cardH) * 0.18)) * pop;
+    if (loupeR > 4) {
+      ctx.save();
+      ctx.shadowColor = "rgba(0,0,0,0.55)";
+      ctx.shadowBlur = 24;
+      ctx.shadowOffsetY = 10;
+      ctx.beginPath();
+      ctx.arc(targetX, targetY, loupeR, 0, Math.PI * 2);
+      ctx.fillStyle = "#090B10";
+      ctx.fill();
+      ctx.clip();
+
+      // Draw zoomed crop from screenshot around (focusX, focusY)
+      const zoom = 1.85;
+      const srcW = img.naturalWidth / zoom;
+      const srcH = img.naturalHeight / zoom;
+      const sx = Math.max(0, Math.min(img.naturalWidth - srcW, focusX * img.naturalWidth - srcW / 2));
+      const sy = Math.max(0, Math.min(img.naturalHeight - srcH, focusY * img.naturalHeight - srcH / 2));
+      ctx.drawImage(
+        img,
+        sx,
+        sy,
+        srcW,
+        srcH,
+        targetX - loupeR,
+        targetY - loupeR,
+        loupeR * 2,
+        loupeR * 2
+      );
+      ctx.restore();
+
+      // Glossy rim around loupe
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(targetX, targetY, loupeR, 0, Math.PI * 2);
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(targetX, targetY, loupeR - 2, 0, Math.PI * 2);
+      ctx.strokeStyle = "rgba(255,255,255,0.45)";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  // Crisp studio pointer cursor
+  if (progress > 0.1) {
+    const clickSquish =
+      (progress > 0.42 && progress < 0.5) || (progress > 0.7 && progress < 0.78) ? 0.84 : 1;
+    ctx.save();
+    ctx.translate(curX, curY);
+    ctx.scale(clickSquish, clickSquish);
+    ctx.shadowColor = "rgba(0,0,0,0.5)";
+    ctx.shadowBlur = 8;
+    ctx.shadowOffsetY = 3;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(0, 22);
+    ctx.lineTo(6, 17);
+    ctx.lineTo(10.5, 25);
+    ctx.lineTo(13.5, 23.5);
+    ctx.lineTo(9, 15.5);
+    ctx.lineTo(16, 15.5);
+    ctx.closePath();
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fill();
+    ctx.strokeStyle = "#0F172A";
+    ctx.lineWidth = 1.6;
+    ctx.stroke();
+    ctx.restore();
+  }
 }
 
 export function renderMotionFrame({
@@ -356,6 +613,14 @@ export function renderMotionFrame({
   useBrandKit,
   mockupScale = 100,
   showFrameHeader = true,
+  cursorSpotlight = false,
+  zoomLoupe = false,
+  focusX = 0.58,
+  focusY = 0.42,
+  floatingBadge = "",
+  floorReflection = true,
+  ambientAura = true,
+  phoneFitMode = "pan",
 }: RenderMotionFrameParams) {
   const m = preset.motion;
   const p = evaluateEasing(progress, easing);
@@ -426,9 +691,18 @@ export function renderMotionFrame({
   let cardW: number;
   let cardH: number;
   if (isPhone) {
-    cardH = Math.min(availH * 0.92, height > width ? 820 : 540);
-    cardW = Math.min(availW * 0.72, cardH * 0.49);
-    cardH = cardW / 0.49;
+    const imgNatRatio =
+      img && img.complete && img.naturalWidth > 0 && img.naturalHeight > 0
+        ? img.naturalWidth / img.naturalHeight
+        : 1.6;
+    const isWideSS = imgNatRatio > 1.08;
+    const maxPhoneW =
+      isWideSS && phoneFitMode === "showcase"
+        ? width * (height > width ? 0.54 : 0.36)
+        : availW * (height > width ? 0.78 : 0.65);
+    cardH = Math.min(availH * 0.92, height > width ? 860 : 540);
+    cardW = Math.min(maxPhoneW, cardH * 0.495);
+    cardH = cardW / 0.495;
   } else {
     cardW = Math.min(840, availW);
     cardH = Math.min(520, availH * 0.88);
@@ -481,6 +755,44 @@ export function renderMotionFrame({
   const centerX = width / 2 + offsetX;
   const centerY = headerH + (height - headerH - 36) / 2 + offsetY;
 
+  // Ambient Aura Halo behind mockup
+  if (ambientAura) {
+    const pulse = 0.92 + 0.14 * Math.sin(progress * Math.PI * 2);
+    const auraR = Math.max(cardW, cardH) * 0.72 * pulse;
+    const aura = ctx.createRadialGradient(centerX, centerY, 10, centerX, centerY, auraR);
+    aura.addColorStop(0, primaryColor);
+    aura.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.save();
+    ctx.globalAlpha = 0.28 * opacity;
+    ctx.fillStyle = aura;
+    ctx.fillRect(0, 0, width, height);
+    ctx.restore();
+  }
+
+  // Glossy Floor Reflection underneath primary card
+  if (floorReflection) {
+    ctx.save();
+    ctx.globalAlpha = 0.18 * opacity;
+    const refGrad = ctx.createRadialGradient(
+      centerX,
+      centerY + cardH * scale * 0.56,
+      10,
+      centerX,
+      centerY + cardH * scale * 0.56,
+      cardW * scale * 0.65
+    );
+    refGrad.addColorStop(0, secondaryColor);
+    refGrad.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = refGrad;
+    ctx.fillRect(
+      centerX - cardW * scale * 0.7,
+      centerY + cardH * scale * 0.44,
+      cardW * scale * 1.4,
+      cardH * scale * 0.35
+    );
+    ctx.restore();
+  }
+
   // Supporting Stacked / Companion Devices behind primary card
   if (m.multiDeviceMode === "stacked-cards") {
     for (let layer = 2; layer >= 1; layer--) {
@@ -514,7 +826,10 @@ export function renderMotionFrame({
       primaryColor,
       null,
       0.7,
-      showFrameHeader
+      showFrameHeader,
+      phoneFitMode,
+      focusX,
+      progress
     );
     ctx.restore();
   }
@@ -539,9 +854,64 @@ export function renderMotionFrame({
     primaryColor,
     shimmerPos,
     shadowScale,
-    showFrameHeader
+    showFrameHeader,
+    phoneFitMode,
+    focusX,
+    progress
   );
+
+  if (cursorSpotlight || zoomLoupe) {
+    drawMotionCursorAndLoupe(
+      ctx,
+      img,
+      -cardW / 2,
+      -cardH / 2,
+      cardW,
+      cardH,
+      focusX,
+      focusY,
+      progress,
+      primaryColor,
+      zoomLoupe
+    );
+  }
   ctx.restore();
+
+  // Floating 3D Stat / Callout Pill (Eye-Catching Social Proof)
+  if (floatingBadge && floatingBadge.trim()) {
+    const badgePop = evaluateEasing(clamp01((progress - 0.16) / 0.3), "spring");
+    if (badgePop > 0.04) {
+      const floatOff = Math.sin(progress * Math.PI * 2) * 7;
+      const bx = Math.min(width - 140, centerX + cardW * scale * 0.34);
+      const by = Math.max(headerH + 24, centerY - cardH * scale * 0.36 + floatOff);
+
+      ctx.save();
+      ctx.globalAlpha = opacity * clamp01(badgePop);
+      ctx.translate(bx, by);
+      ctx.scale(0.85 + 0.15 * badgePop, 0.85 + 0.15 * badgePop);
+      ctx.font = "700 13px 'Plus Jakarta Sans', sans-serif";
+      const textW = ctx.measureText(floatingBadge.trim()).width;
+      const pillW = Math.min(width * 0.45, Math.max(120, textW + 34));
+      const pillH = 34;
+
+      ctx.shadowColor = "rgba(0,0,0,0.45)";
+      ctx.shadowBlur = 20;
+      ctx.shadowOffsetY = 8;
+      roundRect(ctx, -pillW / 2, -pillH / 2, pillW, pillH, 10);
+      ctx.fillStyle = "rgba(15, 18, 28, 0.9)";
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = secondaryColor;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      ctx.fillStyle = "#FFFFFF";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(floatingBadge.trim(), 0, 0, pillW - 18);
+      ctx.restore();
+    }
+  }
 
   // Companion Mobile Overlay for Laptop-to-Mobile transitions
   if (m.multiDeviceMode === "laptop-to-mobile") {

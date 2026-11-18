@@ -205,6 +205,15 @@ export type StudioImageFilterId =
 
 export type CanvasSelectedElement = "device" | "caption" | "backdrop";
 
+export type PhoneFitMode = "showcase" | "pan" | "fit";
+
+export type StudioCssAnimation =
+  | "none"
+  | "entrance-rise"
+  | "tilt-orbit"
+  | "float-hover"
+  | "spring-pop";
+
 export interface StudioState {
   imageSrc: string;
   imageName: string;
@@ -212,6 +221,8 @@ export interface StudioState {
   mockupData: MockupContentData;
   frame: FrameType;
   showFrameHeader?: boolean;
+  phoneFit?: PhoneFitMode;
+  phonePanX?: number; // 0..100%
   browserUrl: string;
   windowTitle: string;
   aspectRatio: AspectRatioId;
@@ -231,7 +242,12 @@ export interface StudioState {
   rotateX: number;
   rotateY: number;
   rotateZ: number;
+  cssAnimation?: StudioCssAnimation;
   imageFilter?: StudioImageFilterId;
+  loupeEnabled?: boolean;
+  loupeX?: number; // 0..1
+  loupeY?: number; // 0..1
+  loupeLabel?: string;
   showCaption: boolean;
   captionEyebrow: string;
   captionTitle: string;
@@ -318,6 +334,12 @@ export interface CarouselSlide {
   rotateX: number;
   rotateY: number;
   rotateZ: number;
+  badgeText?: string;
+  spotlightEnabled?: boolean;
+  spotlightX?: number;
+  spotlightY?: number;
+  phoneFit?: PhoneFitMode;
+  phonePanX?: number;
 }
 
 /* ---------------- Short Film Motions (Multi-Screenshot Pro Editor) ---------------- */

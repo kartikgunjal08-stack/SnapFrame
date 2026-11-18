@@ -1,14 +1,16 @@
 import React, { useRef, useState } from "react";
-import { Download, Copy, Check, Image as ImageIcon, RotateCw, ChevronDown } from "lucide-react";
+import { Download, Copy, Check, Image as ImageIcon, RotateCw, ChevronDown, Video, Sparkles } from "lucide-react";
 import { BACKGROUND_PRESETS } from "../data/presets";
 import {
   BackdropPattern,
   ExportFormat,
   ExportScale,
   FrameType,
+  PhoneFitMode,
   ShadowLevel,
   SocialExportPreset,
   SocialExportPresetId,
+  StudioCssAnimation,
   StudioState,
   TiltPreset,
 } from "../types/studio";
@@ -19,6 +21,7 @@ import { PresetExportPanel } from "./PresetExportPanel";
 interface RightInspectorProps {
   state: StudioState;
   isExporting: boolean;
+  mp4Progress?: number | null;
   copiedSuccess: boolean;
   activePresetExportingId: SocialExportPresetId | "all" | null;
   historyEntries: HistoryEntry[];
@@ -31,6 +34,7 @@ interface RightInspectorProps {
   onUpdate: (patch: Partial<StudioState>) => void;
   onExportDownload: () => void;
   onExportCopy: () => void;
+  onExportMp4: () => void;
   onPreviewSocialPreset: (preset: SocialExportPreset) => void;
   onExportSocialPreset: (preset: SocialExportPreset) => void;
   onExportAllSocialPresets: () => void;
@@ -58,6 +62,7 @@ const PATTERN_OPTIONS: { id: BackdropPattern; label: string }[] = [
 export const RightInspector: React.FC<RightInspectorProps> = ({
   state,
   isExporting,
+  mp4Progress = null,
   copiedSuccess,
   activePresetExportingId,
   historyEntries,
@@ -70,6 +75,7 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
   onUpdate,
   onExportDownload,
   onExportCopy,
+  onExportMp4,
   onPreviewSocialPreset,
   onExportSocialPreset,
   onExportAllSocialPresets,
@@ -214,7 +220,8 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
               </div>
               {(state.frame === "macos-dark" ||
                 state.frame === "macos-light" ||
-                state.frame === "browser") && (
+                state.frame === "browser" ||
+                state.frame === "iphone") && (
                 <label className="mt-2.5 flex items-center justify-between text-[11px] text-zinc-300 cursor-pointer">
                   <span>Show Brand / URL Bar</span>
                   <input
@@ -224,6 +231,58 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
                     className="accent-[#2563EB]"
                   />
                 </label>
+              )}
+
+              {state.frame === "iphone" && (
+                <div className="mt-3 pt-2.5 border-t border-[#1E1E24] space-y-2">
+                  <div className="flex items-center justify-between text-[11px] text-zinc-300">
+                    <span className="font-medium">Desktop SS in Phone</span>
+                    <span className="text-[10px] text-zinc-500">Wide Fix</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1">
+                    {(
+                      [
+                        { id: "showcase", label: "Pop-Out" },
+                        { id: "pan", label: "Fill & Pan" },
+                        { id: "fit", label: "Ambient Fit" },
+                      ] as { id: PhoneFitMode; label: string }[]
+                    ).map((opt) => {
+                      const active = (state.phoneFit ?? "showcase") === opt.id;
+                      return (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          onClick={() => onUpdate({ phoneFit: opt.id })}
+                          className={`py-1.5 px-1 rounded-md text-[10.5px] font-medium border transition-colors whitespace-nowrap cursor-pointer ${
+                            active
+                              ? "bg-[#2563EB]/20 border-[#3B82F6] text-white"
+                              : "bg-[#141419] border-[#22222A] text-zinc-400 hover:text-zinc-200"
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {(state.phoneFit ?? "showcase") === "pan" && (
+                    <div>
+                      <div className="flex items-center justify-between text-[10.5px] text-zinc-400 mb-1">
+                        <span>Horizontal Focus Pan</span>
+                        <span className="font-mono-tabular text-zinc-300">
+                          {state.phonePanX ?? 50}%
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min={0}
+                        max={100}
+                        value={state.phonePanX ?? 50}
+                        onChange={(e) => onUpdate({ phonePanX: Number(e.target.value) })}
+                        className="studio-slider"
+                      />
+                    </div>
+                  )}
+                </div>
               )}
             </section>
 
@@ -394,7 +453,7 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
               <input
                 type="range"
                 min={45}
-                max={130}
+                max={145}
                 value={state.scale}
                 onChange={(e) => onUpdate({ scale: Number(e.target.value) })}
                 className="studio-slider"
@@ -511,12 +570,102 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
                 </div>
               </div>
             )}
+
+            <div className="h-px bg-[#1E1E24] my-3" />
+
+            {/* CSS Animation Sequence */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-1.5 text-xs font-semibold text-zinc-200">
+                  <Sparkles className="w-3.5 h-3.5 text-[#60A5FA]" />
+                  CSS Animation Sequence
+                </span>
+                <span className="text-[10px] font-mono-tabular text-zinc-500">4s MP4 ready</span>
+              </div>
+              <div className="grid grid-cols-3 gap-1">
+                {(
+                  [
+                    { id: "tilt-orbit", label: "3D Sway" },
+                    { id: "entrance-rise", label: "Rise In" },
+                    { id: "float-hover", label: "Float" },
+                    { id: "spring-pop", label: "Spring" },
+                    { id: "none", label: "Static" },
+                  ] as { id: StudioCssAnimation; label: string }[]
+                ).map((anim) => {
+                  const active = (state.cssAnimation ?? "tilt-orbit") === anim.id;
+                  return (
+                    <button
+                      key={anim.id}
+                      type="button"
+                      onClick={() => onUpdate({ cssAnimation: anim.id })}
+                      className={`py-1.5 px-1 rounded-md text-[10.5px] font-medium border transition-colors whitespace-nowrap cursor-pointer ${
+                        active
+                          ? "bg-[#2563EB]/20 border-[#3B82F6] text-white"
+                          : "bg-[#141419] border-[#22222A] text-zinc-400 hover:text-zinc-200"
+                      }`}
+                    >
+                      {anim.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="h-px bg-[#1E1E24] my-3" />
+
+            {/* 5. Spotlight Magnifier & Callout Pin */}
+            <div className="space-y-2.5">
+              <label className="flex items-center justify-between text-xs font-semibold text-zinc-200 cursor-pointer">
+                <span>Spotlight Zoom Loupe</span>
+                <input
+                  type="checkbox"
+                  checked={Boolean(state.loupeEnabled)}
+                  onChange={(e) =>
+                    onUpdate({
+                      loupeEnabled: e.target.checked,
+                      loupeX: state.loupeX ?? 0.58,
+                      loupeY: state.loupeY ?? 0.42,
+                      loupeLabel:
+                        state.loupeLabel !== undefined ? state.loupeLabel : "⚡ Key Feature",
+                    })
+                  }
+                  className="accent-[#2563EB] cursor-pointer"
+                />
+              </label>
+
+              {state.loupeEnabled && (
+                <div className="space-y-2">
+                  <p className="text-[10.5px] text-zinc-400">
+                    Click anywhere on your screenshot canvas to reposition the spotlight & 2× lens.
+                  </p>
+                  <input
+                    type="text"
+                    value={state.loupeLabel ?? ""}
+                    onChange={(e) => onUpdate({ loupeLabel: e.target.value })}
+                    placeholder="Optional callout badge text"
+                    className="w-full px-2.5 py-1.5 rounded-md bg-[#16161C] border border-[#24242E] text-xs text-zinc-100 placeholder-zinc-500"
+                  />
+                  <div className="flex flex-wrap gap-1">
+                    {["⚡ Key Feature", "+340% ROI", "★ 4.9 Rated", ""].map((chip, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => onUpdate({ loupeLabel: chip })}
+                        className="px-1.5 py-0.5 rounded bg-[#16161C] hover:bg-[#22222C] border border-[#262632] text-[10px] text-zinc-300 cursor-pointer"
+                      >
+                        {chip || "No Label"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </section>
         )}
       </div>
 
-      {/* Export Controls Footer */}
-      <div className="p-4 border-t border-[#1E1E24] bg-[#0D0D11] space-y-3">
+      {/* Export Controls Footer (bottom safe clearance for host preview badges) */}
+      <div className="p-4 pb-20 border-t border-[#1E1E24] bg-[#0D0D11] space-y-3">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1 p-0.5 rounded-md bg-[#16161C] border border-[#24242E]">
             {([1, 2, 3] as ExportScale[]).map((sc) => (
@@ -557,7 +706,7 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
         <div className="grid grid-cols-2 gap-2">
           <button
             type="button"
-            disabled={isExporting}
+            disabled={isExporting || mp4Progress !== null}
             onClick={onExportCopy}
             className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg bg-[#181820] hover:bg-[#22222D] border border-[#2A2A35] text-xs font-medium text-zinc-100 transition-colors disabled:opacity-50 whitespace-nowrap cursor-pointer"
           >
@@ -576,14 +725,24 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
 
           <button
             type="button"
-            disabled={isExporting}
+            disabled={isExporting || mp4Progress !== null}
             onClick={onExportDownload}
             className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg bg-[#F4F4F6] hover:bg-white text-xs font-semibold text-[#0A0A0C] transition-colors disabled:opacity-50 whitespace-nowrap cursor-pointer"
           >
             <Download className="w-3.5 h-3.5" />
-            {isExporting ? "Rendering..." : "Download"}
+            {isExporting && mp4Progress === null ? "Rendering..." : "Download"}
           </button>
         </div>
+
+        <button
+          type="button"
+          disabled={isExporting || mp4Progress !== null}
+          onClick={onExportMp4}
+          className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg bg-[#2563EB] hover:bg-[#1D4ED8] text-xs font-semibold text-white transition-colors disabled:opacity-60 whitespace-nowrap cursor-pointer"
+        >
+          <Video className="w-3.5 h-3.5" />
+          {mp4Progress !== null ? `Recording MP4 (${mp4Progress}%)...` : "Export Short MP4 (4s)"}
+        </button>
       </div>
     </aside>
   );

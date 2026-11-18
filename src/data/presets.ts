@@ -667,6 +667,7 @@ export const INITIAL_STUDIO_STATE: StudioState = {
   rotateX: 0,
   rotateY: 0,
   rotateZ: 0,
+  cssAnimation: "tilt-orbit",
   showCaption: true,
   captionEyebrow: "New Release",
   captionTitle: "Real-time revenue metrics, zero setup.",

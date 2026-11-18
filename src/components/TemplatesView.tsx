@@ -70,7 +70,7 @@ export const TemplatesView: React.FC<TemplatesViewProps> = ({ onApplyTemplate })
 
   return (
     <div className="flex-1 overflow-y-auto studio-scroll bg-[#0A0A0C]">
-      <div className="max-w-6xl mx-auto px-6 py-10">
+      <div className="max-w-6xl mx-auto px-6 py-10 pb-24">
         {/* Header & Search */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
           <div className="max-w-2xl">
@@ -282,7 +282,7 @@ export const TemplatesView: React.FC<TemplatesViewProps> = ({ onApplyTemplate })
                       <div
                         className={`relative z-10 overflow-hidden shadow-2xl transition-transform duration-200 group-hover:scale-[1.03] ${
                           isPhone
-                            ? "w-20 rounded-2xl p-1 bg-[#121215] border border-white/15"
+                            ? "w-24 rounded-2xl p-1 bg-[#121215] border border-white/15"
                             : isTablet
                               ? "w-[80%] rounded-xl p-1.5 bg-[#101115] border border-white/15"
                               : isGlass

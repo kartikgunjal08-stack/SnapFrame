@@ -1,11 +1,15 @@
 import { SetStateAction, useCallback, useEffect, useRef, useState } from "react";
-import { Undo2, Redo2 } from "lucide-react";
+import { Undo2, Redo2, Lock, LogOut, UserCheck, Eye } from "lucide-react";
+import { AuthModal } from "./components/AuthModal";
+import { AuthPage } from "./components/AuthPage";
 import { BrandKitPanel } from "./components/BrandKitPanel";
 import { CarouselBuilderView } from "./components/CarouselBuilderView";
 import { GuideView } from "./components/GuideView";
+import { ImageCropModal } from "./components/ImageCropModal";
 import { LeftToolbar } from "./components/LeftToolbar";
 import { MockupCanvas } from "./components/MockupCanvas";
 import { MotionStudioView } from "./components/MotionStudioView";
+import { PreviewTourBar } from "./components/PreviewTourBar";
 import { RightInspector } from "./components/RightInspector";
 import { createDefaultShortFilmShots, ShortFilmStudioView } from "./components/ShortFilmStudioView";
 import { TemplatesView } from "./components/TemplatesView";
@@ -32,7 +36,10 @@ import {
   loadBrandKit,
   saveBrandKit,
 } from "./utils/brandKitStorage";
-import { copyElementToClipboard, exportElementToImage } from "./utils/exportCanvas";
+import { copyElementToClipboard, exportElementToImage, exportStudioVideo } from "./utils/exportCanvas";
+import { formatPlanLabel } from "./utils/supabase";
+import { fetchCloudBrandKit, upsertCloudBrandKit } from "./utils/supabaseSync";
+import { useAuth } from "./hooks/useAuth";
 import { useGlobalHistory } from "./hooks/useGlobalHistory";
 
 const COALESCEABLE_STUDIO_KEYS = new Set<keyof StudioState>([
@@ -69,8 +76,27 @@ function describeStudioPatch(patch: Partial<StudioState>): string {
 }
 
 export default function App() {
+  const {
+    user,
+    profile,
+    loading: authLoading,
+    authBusy,
+    isSupabaseConfigured,
+    signIn,
+    signUp,
+    signOut,
+  } = useAuth();
+
+  const [isPreviewMode, setIsPreviewMode] = useState(false);
+  const [authModal, setAuthModal] = useState<{ open: boolean; reason?: string | null }>({
+    open: false,
+    reason: null,
+  });
+
   const [activeView, setActiveView] = useState<AppView>("studio");
   const [brandKitOpen, setBrandKitOpen] = useState(false);
+  const [studioCropOpen, setStudioCropOpen] = useState(false);
+  const isPreviewLocked = !user;
 
   const {
     present,
@@ -97,17 +123,50 @@ export default function App() {
   const { studioState: state, brandKit, shortFilmShots } = present;
 
   const [isExporting, setIsExporting] = useState(false);
+  const [mp4Progress, setMp4Progress] = useState<number | null>(null);
   const [activePresetExportingId, setActivePresetExportingId] =
     useState<SocialExportPresetId | "all" | null>(null);
   const [copiedSuccess, setCopiedSuccess] = useState(false);
   const [notice, setNotice] = useState<{ text: string; type: "info" | "error" } | null>(null);
 
   const exportRef = useRef<HTMLDivElement | null>(null);
+  const deviceRef = useRef<HTMLDivElement | null>(null);
 
-  // Keep Brand Kit persisted in localStorage across all commits, undos, and redos
+  // Keep Brand Kit persisted in localStorage (and Supabase when signed in)
   useEffect(() => {
     saveBrandKit(brandKit);
-  }, [brandKit]);
+    if (!user) return;
+    const timer = window.setTimeout(() => {
+      void upsertCloudBrandKit(user.id, brandKit);
+    }, 650);
+    return () => window.clearTimeout(timer);
+  }, [brandKit, user]);
+
+  // Hydrate cloud Brand Kit and close Preview/Auth modal once signed in
+  const hydratedUserRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!user) {
+      hydratedUserRef.current = null;
+      return;
+    }
+    setIsPreviewMode(false);
+    setAuthModal({ open: false, reason: null });
+
+    if (hydratedUserRef.current === user.id) return;
+    hydratedUserRef.current = user.id;
+
+    void fetchCloudBrandKit(user.id).then((cloudKit) => {
+      if (!cloudKit) return;
+      commit(
+        (curr) => ({
+          ...curr,
+          brandKit: cloudKit,
+          studioState: applyBrandKitToStudioState(curr.studioState, cloudKit),
+        }),
+        { record: false }
+      );
+    });
+  }, [commit, user]);
 
   const showNotice = useCallback((text: string, type: "info" | "error" = "info") => {
     setNotice({ text, type });
@@ -115,6 +174,17 @@ export default function App() {
       setNotice((current) => (current?.text === text ? null : current));
     }, 3200);
   }, []);
+
+  const openAuthModal = useCallback((reason?: string) => {
+    setAuthModal({ open: true, reason: reason || null });
+  }, []);
+
+  const requireAuthForUpload = useCallback(() => {
+    openAuthModal(
+      "Preview Mode only supports built-in samples. Sign in or log in to add your own screenshots."
+    );
+    showNotice("Sign in required to upload custom screenshots.", "info");
+  }, [openAuthModal, showNotice]);
 
   const handleUndo = useCallback(() => {
     const label = undo();
@@ -289,6 +359,10 @@ export default function App() {
 
   const handleUploadFile = useCallback(
     (file: File) => {
+      if (isPreviewLocked) {
+        requireAuthForUpload();
+        return;
+      }
       const reader = new FileReader();
       reader.onload = () => {
         if (typeof reader.result === "string") {
@@ -338,7 +412,7 @@ export default function App() {
       };
       reader.readAsDataURL(file);
     },
-    [activeView, commit, showNotice]
+    [activeView, commit, isPreviewLocked, requireAuthForUpload, showNotice]
   );
 
   // Global clipboard paste support (Ctrl+V / Cmd+V)
@@ -353,6 +427,11 @@ export default function App() {
       for (let i = 0; i < items.length; i++) {
         const item = items[i];
         if (item.type.startsWith("image/")) {
+          if (isPreviewLocked) {
+            e.preventDefault();
+            requireAuthForUpload();
+            return;
+          }
           const blob = item.getAsFile();
           if (blob) {
             handleUploadFile(blob);
@@ -365,7 +444,7 @@ export default function App() {
     };
     window.addEventListener("paste", handlePaste);
     return () => window.removeEventListener("paste", handlePaste);
-  }, [activeView, handleUploadFile]);
+  }, [activeView, handleUploadFile, isPreviewLocked, requireAuthForUpload]);
 
   const handleSelectSample = (sampleId: SampleId) => {
     const sample = SAMPLE_MOCKUPS[sampleId];
@@ -394,8 +473,10 @@ export default function App() {
             ? {
                 frame: "iphone",
                 aspectRatio: "9:16",
-                padding: 36,
-                scale: 94,
+                padding: 24,
+                scale: 105,
+                phoneFit: "showcase",
+                phonePanX: 50,
               }
             : {}),
           safeZoneId: "none",
@@ -465,6 +546,37 @@ export default function App() {
     } catch {
       showNotice("Clipboard blocked by browser permissions — use Download instead.", "error");
     } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleExportMp4 = async () => {
+    if (!exportRef.current || !deviceRef.current) {
+      showNotice("Open Studio canvas to record an animated MP4.", "error");
+      return;
+    }
+    try {
+      setIsExporting(true);
+      setMp4Progress(0);
+      await new Promise((r) => setTimeout(r, 50));
+      const res = await exportStudioVideo({
+        stageElement: exportRef.current,
+        deviceElement: deviceRef.current,
+        animation: state.cssAnimation ?? "tilt-orbit",
+        fileNameBase: state.imageName,
+        durationSec: 4,
+        onProgress: (pct) => setMp4Progress(pct),
+      });
+      showNotice(
+        res.ext === "mp4"
+          ? `Exported 4s animated MP4 (${res.width}×${res.height})`
+          : `Browser lacked native H.264 MP4 muxing — exported crisp 4s WebM (${res.width}×${res.height})`
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to record video.";
+      showNotice(msg, "error");
+    } finally {
+      setMp4Progress(null);
       setIsExporting(false);
     }
   };
@@ -613,6 +725,33 @@ export default function App() {
     { id: "guide", label: "Guide" },
   ];
 
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-[#07080B] text-zinc-200 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 rounded-full border-2 border-[#3B82F6] border-t-transparent animate-spin" />
+          <span className="text-xs text-zinc-400 font-medium">Loading SnapFramy workspace...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user && !isPreviewMode) {
+    return (
+      <AuthPage
+        authBusy={authBusy}
+        isSupabaseConfigured={isSupabaseConfigured}
+        onSignIn={signIn}
+        onSignUp={signUp}
+        onWatchInPreviewMode={() => {
+          setIsPreviewMode(true);
+          setActiveView("studio");
+          showNotice("Preview Mode active — enjoy the interactive SaaS tour!");
+        }}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen lg:h-screen flex flex-col bg-[#0A0A0C] text-[#F4F4F6] lg:overflow-hidden">
       {/* Top Bar — Strict 3-Zone Contract */}
@@ -677,6 +816,53 @@ export default function App() {
             </button>
           </div>
 
+          {user ? (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#141419] border border-[#24242E]">
+              <UserCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <span className="text-[11px] font-medium text-zinc-200 max-w-[85px] sm:max-w-[130px] truncate">
+                {profile?.full_name || user.email}
+              </span>
+              {profile?.is_redeemed && (
+                <span
+                  title={
+                    profile.plan_expires_at
+                      ? `1 Month subscription active until ${new Date(
+                          profile.plan_expires_at
+                        ).toLocaleDateString()}`
+                      : "1 Month Monthly Subscription"
+                  }
+                  className="px-1.5 py-0.5 rounded bg-[#2563EB]/20 text-[9px] font-mono-tabular uppercase text-blue-300 whitespace-nowrap"
+                >
+                  {formatPlanLabel(profile.plan)}
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  void signOut().then(() => {
+                    setIsPreviewMode(false);
+                  });
+                }}
+                title="Sign Out"
+                className="p-1 rounded text-zinc-400 hover:text-white hover:bg-white/10 cursor-pointer"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() =>
+                openAuthModal("Sign in or log in to upload your own screenshots.")
+              }
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#161E31] hover:bg-[#1E2A45] border border-[#2C3E6B] text-xs font-semibold text-blue-100 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+            >
+              <Eye className="w-3.5 h-3.5 text-[#60A5FA] sm:hidden" />
+              <Lock className="w-3.5 h-3.5 text-[#60A5FA] hidden sm:inline" />
+              Sign In
+            </button>
+          )}
+
           {activeView === "studio" ? (
             <button
               type="button"
@@ -697,6 +883,15 @@ export default function App() {
           )}
         </div>
       </header>
+
+      {/* Interactive SaaS Tour Strip when in Preview Mode */}
+      {isPreviewMode && !user && (
+        <PreviewTourBar
+          activeView={activeView}
+          onSelectView={setActiveView}
+          onOpenAuth={(reason) => openAuthModal(reason)}
+        />
+      )}
 
       {/* Mobile Navigation Strip */}
       <div className="flex md:hidden items-center gap-1 px-4 py-2 border-b border-[#1E1E24] bg-[#0E0E12] overflow-x-auto">
@@ -727,15 +922,22 @@ export default function App() {
             onSelectSample={handleSelectSample}
             onOpenTemplates={() => setActiveView("templates")}
             onOpenBrandKit={() => setBrandKitOpen(true)}
+            onOpenCrop={() => setStudioCropOpen(true)}
+            isPreviewLocked={isPreviewLocked}
+            onRequireAuthForUpload={requireAuthForUpload}
           />
           <MockupCanvas
             state={state}
             brandKit={brandKit}
             isExporting={isExporting}
             exportRef={exportRef}
+            deviceRef={deviceRef}
             onUpdate={updateState}
             onUpdateMockupData={updateMockupData}
             onUploadFile={handleUploadFile}
+            onOpenCrop={() => setStudioCropOpen(true)}
+            isPreviewLocked={isPreviewLocked}
+            onRequireAuthForUpload={requireAuthForUpload}
             onResetStudio={() =>
               commit(
                 (curr) => ({
@@ -749,6 +951,7 @@ export default function App() {
           <RightInspector
             state={state}
             isExporting={isExporting}
+            mp4Progress={mp4Progress}
             copiedSuccess={copiedSuccess}
             activePresetExportingId={activePresetExportingId}
             historyEntries={historyEntries}
@@ -761,6 +964,7 @@ export default function App() {
             onUpdate={updateState}
             onExportDownload={handleExportDownload}
             onExportCopy={handleExportCopy}
+            onExportMp4={handleExportMp4}
             onPreviewSocialPreset={handlePreviewSocialPreset}
             onExportSocialPreset={handleExportSocialPreset}
             onExportAllSocialPresets={handleExportAllSocialPresets}
@@ -775,6 +979,8 @@ export default function App() {
           onChangeShots={handleChangeShortFilmShots}
           onOpenBrandKit={() => setBrandKitOpen(true)}
           onNotify={showNotice}
+          isPreviewLocked={isPreviewLocked}
+          onRequireAuthForUpload={requireAuthForUpload}
         />
       )}
 
@@ -786,6 +992,21 @@ export default function App() {
           onUploadFile={handleUploadFile}
           onOpenBrandKit={() => setBrandKitOpen(true)}
           onNotify={showNotice}
+          onApplyCroppedImage={(croppedUrl) => {
+            commit(
+              (curr) => ({
+                ...curr,
+                studioState: {
+                  ...curr.studioState,
+                  imageSrc: croppedUrl,
+                  activeSampleId: null,
+                },
+              }),
+              { label: "Crop Motion screenshot" }
+            );
+          }}
+          isPreviewLocked={isPreviewLocked}
+          onRequireAuthForUpload={requireAuthForUpload}
         />
       )}
 
@@ -793,9 +1014,12 @@ export default function App() {
         <CarouselBuilderView
           brandKit={brandKit}
           mockupData={state.mockupData}
+          activeStudioImageSrc={state.imageSrc}
           onUpdateMockupData={updateMockupData}
           onOpenBrandKit={() => setBrandKitOpen(true)}
           onNotify={showNotice}
+          isPreviewLocked={isPreviewLocked}
+          onRequireAuthForUpload={requireAuthForUpload}
         />
       )}
 
@@ -814,6 +1038,49 @@ export default function App() {
         onChange={handleUpdateBrandKit}
         onApplyToWorkspace={handleApplyBrandKitToWorkspace}
         onClose={() => setBrandKitOpen(false)}
+      />
+
+      {/* Crop & Auto-Fit Modal for Studio */}
+      <ImageCropModal
+        open={studioCropOpen}
+        imageSrc={state.imageSrc}
+        title="Crop & Auto-Fit Screenshot"
+        targetFrameAspect={
+          state.frame === "iphone" ? 9 / 19 : state.frame === "tablet" ? 4 / 3 : 16 / 10
+        }
+        targetFrameLabel={
+          state.frame === "iphone" ? "iPhone" : state.frame === "tablet" ? "Tablet" : "Frame"
+        }
+        onApplyCrop={(croppedUrl, croppedRatio) => {
+          commit(
+            (curr) => ({
+              ...curr,
+              studioState: {
+                ...curr.studioState,
+                imageSrc: croppedUrl,
+                activeSampleId: null,
+                scale: Math.min(96, Math.max(85, curr.studioState.scale)),
+                ...(curr.studioState.frame === "iphone"
+                  ? { phoneFit: croppedRatio <= 1.08 ? "pan" : "fit", phonePanX: 50 }
+                  : {}),
+              },
+            }),
+            { label: "Crop & Auto-Fit screenshot" }
+          );
+          showNotice("Cropped screenshot & auto-fitted inside frame");
+        }}
+        onClose={() => setStudioCropOpen(false)}
+      />
+
+      {/* Sign In / Login Modal (Triggered from Preview Mode or locked screenshot upload) */}
+      <AuthModal
+        open={authModal.open}
+        reason={authModal.reason}
+        authBusy={authBusy}
+        isSupabaseConfigured={isSupabaseConfigured}
+        onSignIn={signIn}
+        onSignUp={signUp}
+        onClose={() => setAuthModal({ open: false, reason: null })}
       />
 
       {/* Non-blocking Toast Feedback */}

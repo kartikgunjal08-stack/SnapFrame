@@ -5,6 +5,7 @@ import {
   FilmLookConfig,
   FilmLookId,
   MotionAspectId,
+  PhoneFitMode,
   ShortFilmPreset,
   ShortFilmShot,
 } from "../types/studio";
@@ -243,7 +244,10 @@ function drawShotCard(
   shimmerProgress: number,
   chromaticOffset = 0,
   cssFilter = "none",
-  showBrandHeader = true
+  showBrandHeader = true,
+  phoneFitMode: PhoneFitMode = "pan",
+  focusX = 0.5,
+  panProgress = 0
 ) {
   if (Math.abs(chromaticOffset) > 0.5) {
     ctx.save();
@@ -328,30 +332,111 @@ function drawShotCard(
   ctx.fillStyle = "#080A0F";
   ctx.fillRect(x, contentY, w, contentH);
 
+  const imgRatio =
+    img && img.complete && img.naturalWidth > 0 && img.naturalHeight > 0
+      ? img.naturalWidth / img.naturalHeight
+      : 16 / 10;
+  const isWideDesktopInPhone = frameStyle === "iphone" && imgRatio > 1.08;
+
   if (img && img.complete && img.naturalWidth > 0) {
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = "high";
-    const imgRatio = img.naturalWidth / img.naturalHeight;
     const boxRatio = w / contentH;
-    let dw = w;
-    let dh = contentH;
-    let dx = x;
-    let dy = contentY;
-    if (imgRatio > boxRatio) {
-      dw = w;
-      dh = w / imgRatio;
-      dy = contentY + (contentH - dh) / 2;
+
+    if (isWideDesktopInPhone) {
+      if (phoneFitMode === "pan") {
+        // Subtle ambient echo behind a balanced horizontal glide so text isn't over-zoomed
+        const bgScale = Math.max(w / img.naturalWidth, contentH / img.naturalHeight) * 1.15;
+        const bgW = img.naturalWidth * bgScale;
+        const bgH = img.naturalHeight * bgScale;
+        ctx.save();
+        if ("filter" in ctx) {
+          ctx.filter = cssFilter !== "none" ? `${cssFilter} blur(18px)` : "blur(18px)";
+        }
+        ctx.globalAlpha = 0.36;
+        ctx.drawImage(img, x + (w - bgW) / 2, contentY + (contentH - bgH) / 2, bgW, bgH);
+        ctx.restore();
+
+        const dh = Math.min(contentH, Math.max(w * 1.18, contentH * 0.72));
+        const dw = Math.max(w, dh * imgRatio);
+        const overflowX = Math.max(0, dw - w);
+        const glide = Math.sin(panProgress * Math.PI * 2) * 0.18;
+        const panFrac = clamp01(focusX + glide);
+        const dx = x - overflowX * panFrac;
+        const dy = contentY + (contentH - dh) / 2;
+        ctx.save();
+        roundRect(ctx, x + 4, dy, w - 8, dh, 12);
+        ctx.clip();
+        if ("filter" in ctx) ctx.filter = cssFilter;
+        ctx.drawImage(img, dx, dy, dw, dh);
+        ctx.restore();
+      } else {
+        // Rich blurred ambient backdrop inside tall iPhone
+        const bgScale = Math.max(w / img.naturalWidth, contentH / img.naturalHeight) * 1.15;
+        const bgW = img.naturalWidth * bgScale;
+        const bgH = img.naturalHeight * bgScale;
+        ctx.save();
+        if ("filter" in ctx) {
+          ctx.filter = cssFilter !== "none" ? `${cssFilter} blur(18px)` : "blur(18px)";
+        }
+        ctx.globalAlpha = 0.44;
+        ctx.drawImage(img, x + (w - bgW) / 2, contentY + (contentH - bgH) / 2, bgW, bgH);
+        ctx.restore();
+
+        if (phoneFitMode === "fit") {
+          const pad = 10;
+          const dw = w - pad * 2;
+          const dh = dw / imgRatio;
+          const dy = contentY + (contentH - dh) / 2;
+          ctx.save();
+          ctx.shadowColor = "rgba(0,0,0,0.68)";
+          ctx.shadowBlur = 24;
+          roundRect(ctx, x + pad, dy, dw, dh, 12);
+          ctx.clip();
+          if ("filter" in ctx) ctx.filter = cssFilter;
+          ctx.drawImage(img, x + pad, dy, dw, dh);
+          ctx.restore();
+
+          ctx.save();
+          roundRect(ctx, x + pad, dy, dw, dh, 12);
+          ctx.strokeStyle = "rgba(255,255,255,0.22)";
+          ctx.lineWidth = 1.2;
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+    } else if (frameStyle === "iphone") {
+      // Portrait / mobile SS fills tall iPhone cleanly without black letterbox bars
+      const scaleCover = Math.max(w / img.naturalWidth, contentH / img.naturalHeight);
+      const dw = img.naturalWidth * scaleCover;
+      const dh = img.naturalHeight * scaleCover;
+      const dx = x + (w - dw) / 2;
+      const dy = contentY + (contentH - dh) / 2;
+      ctx.save();
+      if ("filter" in ctx) ctx.filter = cssFilter;
+      ctx.drawImage(img, dx, dy, dw, dh);
+      ctx.restore();
     } else {
-      dh = contentH;
-      dw = contentH * imgRatio;
-      dx = x + (w - dw) / 2;
+      let dw = w;
+      let dh = contentH;
+      let dx = x;
+      let dy = contentY;
+      if (imgRatio > boxRatio) {
+        dw = w;
+        dh = w / imgRatio;
+        dy = contentY + (contentH - dh) / 2;
+      } else {
+        dh = contentH;
+        dw = contentH * imgRatio;
+        dx = x + (w - dw) / 2;
+      }
+      ctx.save();
+      if ("filter" in ctx) {
+        ctx.filter = cssFilter;
+      }
+      ctx.drawImage(img, dx, dy, dw, dh);
+      ctx.restore();
     }
-    ctx.save();
-    if ("filter" in ctx) {
-      ctx.filter = cssFilter;
-    }
-    ctx.drawImage(img, dx, dy, dw, dh);
-    ctx.restore();
   } else {
     ctx.fillStyle = accent;
     roundRect(ctx, x + 20, contentY + 20, 28, 28, 6);
@@ -380,6 +465,61 @@ function drawShotCard(
   ctx.lineWidth = frameStyle === "iphone" ? 2.5 : 1.3;
   ctx.stroke();
   ctx.restore();
+
+  // Pop-Out Desktop Showcase Card across front of iPhone bezel
+  if (
+    isWideDesktopInPhone &&
+    phoneFitMode === "showcase" &&
+    img &&
+    img.complete &&
+    img.naturalWidth > 0
+  ) {
+    const popW = w * 1.5;
+    const popBarH = showBrandHeader ? 22 : 0;
+    const popImgH = popW / imgRatio;
+    const popH = popImgH + popBarH;
+    const popX = x + (w - popW) / 2;
+    const popY = y + (h - popH) / 2;
+
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,0.78)";
+    ctx.shadowBlur = 32;
+    ctx.shadowOffsetY = 16;
+    roundRect(ctx, popX, popY, popW, popH, 12);
+    ctx.fillStyle = "#0B0D12";
+    ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    roundRect(ctx, popX, popY, popW, popH, 12);
+    ctx.clip();
+    if (showBrandHeader) {
+      ctx.fillStyle = "#171820";
+      ctx.fillRect(popX, popY, popW, popBarH);
+      ["#FF5F56", "#FFBD2E", "#27C93F"].forEach((dot, idx) => {
+        ctx.fillStyle = dot;
+        ctx.beginPath();
+        ctx.arc(popX + 12 + idx * 11, popY + popBarH / 2, 3.2, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      ctx.fillStyle = "#94A3B8";
+      ctx.font = "500 9px 'JetBrains Mono', monospace";
+      ctx.textAlign = "center";
+      ctx.fillText(domainLabel, popX + popW / 2, popY + 14);
+    }
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    if ("filter" in ctx) ctx.filter = cssFilter;
+    ctx.drawImage(img, popX, popY + popBarH, popW, popImgH);
+    ctx.restore();
+
+    ctx.save();
+    roundRect(ctx, popX, popY, popW, popH, 12);
+    ctx.strokeStyle = "rgba(255,255,255,0.28)";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.restore();
+  }
 }
 
 function drawCursorClick(
@@ -516,6 +656,7 @@ export interface RenderShortFilmParams {
   useBrandKit: boolean;
   mockupScale?: number;
   showBrandHeader?: boolean;
+  phoneFitMode?: PhoneFitMode;
 }
 
 export function renderShortFilmFrame({
@@ -533,6 +674,7 @@ export function renderShortFilmFrame({
   useBrandKit,
   mockupScale = 100,
   showBrandHeader = true,
+  phoneFitMode = "pan",
 }: RenderShortFilmParams) {
   const cssFilter = buildFilmLookCssFilter(filmLook);
   const safeShots = shots.length > 0 ? shots : [];
@@ -567,23 +709,44 @@ export function renderShortFilmFrame({
   const isPhone = preset.frameStyle === "iphone";
   const userScale = Math.max(0.45, Math.min(1.45, mockupScale / 100));
 
+  const primaryImg = safeShots[0] ? imageMap.get(safeShots[0].id) : undefined;
+  const primaryRatio =
+    primaryImg && primaryImg.complete && primaryImg.naturalWidth > 0 && primaryImg.naturalHeight > 0
+      ? primaryImg.naturalWidth / primaryImg.naturalHeight
+      : 16 / 10;
+
   let rawW: number;
   let rawH: number;
   if (isPhone) {
+    const isWideSS = primaryRatio > 1.08;
     if (isVert) {
-      rawH = Math.min(680, height * 0.62);
-      rawW = rawH * 0.505;
-      if (rawW > width * 0.68) {
-        rawW = width * 0.68;
-        rawH = rawW / 0.505;
-      }
+      const maxW = isWideSS && phoneFitMode === "showcase" ? width * 0.54 : width * 0.74;
+      rawH = Math.min(820, height * 0.68);
+      rawW = Math.min(maxW, rawH * 0.5);
+      rawH = rawW / 0.5;
     } else {
-      rawH = Math.min(540, height * 0.72);
-      rawW = rawH * 0.505;
+      rawH = Math.min(540, height * 0.74);
+      rawW = Math.min(width * 0.38, rawH * 0.5);
+      rawH = rawW / 0.5;
     }
   } else {
-    rawW = isVert ? Math.min(620, width * 0.86) : Math.min(780, width * 0.74);
-    rawH = isVert ? Math.min(390, height * 0.36) : Math.min(460, height * 0.62);
+    const chromeReserve =
+      showBrandHeader &&
+      (preset.frameStyle === "macos-dark" ||
+        preset.frameStyle === "macos-light" ||
+        preset.frameStyle === "browser")
+        ? 30
+        : 0;
+    const maxW = isVert ? Math.min(640, width * 0.88) : Math.min(800, width * 0.76);
+    const maxH = isVert ? Math.min(540, height * 0.54) : Math.min(480, height * 0.64);
+    const targetBoxRatio = maxW / Math.max(1, maxH - chromeReserve);
+    if (primaryRatio > targetBoxRatio) {
+      rawW = maxW;
+      rawH = Math.max(220, Math.min(maxH, maxW / primaryRatio + chromeReserve));
+    } else {
+      rawH = maxH;
+      rawW = Math.max(240, Math.min(maxW, (maxH - chromeReserve) * primaryRatio));
+    }
   }
 
   const baseW = rawW * userScale;
@@ -633,7 +796,10 @@ export function renderShortFilmFrame({
       shimmerT,
       chromaAmt,
       cssFilter,
-      showBrandHeader
+      showBrandHeader,
+      phoneFitMode,
+      shot.focusX ?? 0.5,
+      shimmerT
     );
     ctx.restore();
   };
@@ -944,14 +1110,14 @@ export function renderShortFilmFrame({
       if (isPhone) {
         const fittedH = Math.min(maxSlotH, cellW / 0.52);
         const fittedW = fittedH * 0.52;
-        cellW = Math.min(maxSlotW, fittedW);
+        cellW = Math.min(maxSlotW, fittedW) * (isVert && phoneFitMode === "showcase" ? 0.76 : 1);
         cellH = cellW / 0.52;
       } else {
         cellW = Math.min(maxSlotW, cellW);
         cellH = Math.min(maxSlotH, cellH);
       }
-      const startX = (width - (cols * cellW + (cols - 1) * 16)) / 2;
-      const startY = (height - (rows * cellH + (rows - 1) * 16)) / 2 + 18;
+      const startX = (width - (cols * cellW + (cols - 1) * 18)) / 2;
+      const startY = (height - (rows * cellH + (rows - 1) * 18)) / 2 + 18;
 
       const camZoom = 0.96 + chP * 0.08;
       ctx.save();
@@ -982,7 +1148,10 @@ export function renderShortFilmFrame({
           chP,
           0,
           cssFilter,
-          showBrandHeader
+          showBrandHeader,
+          phoneFitMode,
+          shot.focusX ?? 0.5,
+          chP
         );
         ctx.restore();
       });

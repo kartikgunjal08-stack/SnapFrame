@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Plus,
   Trash2,
@@ -11,7 +11,16 @@ import {
   Smartphone,
   Eye,
   EyeOff,
+  Shuffle,
+  Copy,
+  Crosshair,
+  ZoomIn,
+  Maximize2,
+  Minimize2,
+  Lock,
+  Crop,
 } from "lucide-react";
+import { ImageCropModal } from "./ImageCropModal";
 import { toPng } from "html-to-image";
 import { BACKGROUND_PRESETS, SAMPLE_MOCKUPS } from "../data/presets";
 import {
@@ -21,6 +30,7 @@ import {
   CarouselSlide,
   FrameType,
   MockupContentData,
+  PhoneFitMode,
   SampleId,
 } from "../types/studio";
 import { getFontMoodClasses } from "../utils/brandKitStorage";
@@ -30,12 +40,15 @@ import { LiveSceneRenderer } from "./LiveSceneRenderer";
 interface CarouselBuilderViewProps {
   brandKit: BrandKit;
   mockupData: MockupContentData;
+  activeStudioImageSrc?: string;
   onUpdateMockupData: <K extends keyof MockupContentData>(
     scene: K,
     patch: Partial<MockupContentData[K]>
   ) => void;
   onOpenBrandKit: () => void;
   onNotify: (msg: string, type?: "info" | "error") => void;
+  isPreviewLocked?: boolean;
+  onRequireAuthForUpload?: () => void;
 }
 
 const CAROUSEL_FORMATS: Record<
@@ -268,9 +281,12 @@ function createInitialSlides(brandName: string): CarouselSlide[] {
 export const CarouselBuilderView: React.FC<CarouselBuilderViewProps> = ({
   brandKit,
   mockupData,
+  activeStudioImageSrc,
   onUpdateMockupData,
   onOpenBrandKit,
   onNotify,
+  isPreviewLocked = false,
+  onRequireAuthForUpload,
 }) => {
   const [activeTemplateId, setActiveTemplateId] = useState(CAROUSEL_TEMPLATES[0].id);
   const [format, setFormat] = useState<CarouselFormat>("linkedin-4x5");
@@ -279,11 +295,24 @@ export const CarouselBuilderView: React.FC<CarouselBuilderViewProps> = ({
   const [useBrandTint, setUseBrandTint] = useState(true);
   const [showBrandHeader, setShowBrandHeader] = useState(true);
   const [showSlideText, setShowSlideText] = useState(true);
+  const [stripZoom, setStripZoom] = useState<0.55 | 0.78 | 1>(0.78);
   const [slides, setSlides] = useState<CarouselSlide[]>(() =>
     createInitialSlides(brandKit.brandName)
   );
   const [activeIndex, setActiveIndex] = useState(0);
+  const [slideAspectMap, setSlideAspectMap] = useState<Record<string, number>>({});
   const [isExportingAll, setIsExportingAll] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [cropOpen, setCropOpen] = useState(false);
+
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsFullscreen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isFullscreen]);
 
   const slideRefs = useRef<(HTMLDivElement | null)[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -321,7 +350,8 @@ export const CarouselBuilderView: React.FC<CarouselBuilderViewProps> = ({
         prev.map((s) => ({
           ...s,
           frame: "iphone",
-          scale: Math.max(85, Math.min(105, s.scale)),
+          phoneFit: s.phoneFit ?? "showcase",
+          scale: Math.max(94, Math.min(115, s.scale)),
         }))
       );
       onNotify("Converted Carousel to Phone Format (9:16 · iPhone)");
@@ -362,6 +392,62 @@ export const CarouselBuilderView: React.FC<CarouselBuilderViewProps> = ({
     }
     setSlides((prev) => prev.filter((_, idx) => idx !== index));
     setActiveIndex((prev) => Math.max(0, Math.min(prev, slides.length - 2)));
+  };
+
+  const moveSlide = (index: number, delta: -1 | 1) => {
+    const target = index + delta;
+    if (target < 0 || target >= slides.length) return;
+    setSlides((prev) => {
+      const copy = [...prev];
+      const [item] = copy.splice(index, 1);
+      copy.splice(target, 0, item);
+      return copy;
+    });
+    setActiveIndex(target);
+  };
+
+  const duplicateSlide = (index: number) => {
+    if (slides.length >= 5) {
+      onNotify("Carousel supports up to 5 continuous slides.", "error");
+      return;
+    }
+    const srcSlide = slides[index];
+    const cloned: CarouselSlide = {
+      ...srcSlide,
+      id: `slide-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+    };
+    setSlides((prev) => [...prev.slice(0, index + 1), cloned, ...prev.slice(index + 1)]);
+    setActiveIndex(index + 1);
+    onNotify(`Duplicated Slide ${index + 1}`);
+  };
+
+  const handleDropOnSlide = (idx: number, e: React.DragEvent) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files?.[0];
+    if (!file || !file.type.startsWith("image/")) return;
+    if (isPreviewLocked && onRequireAuthForUpload) {
+      onRequireAuthForUpload();
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        updateSlide(idx, { imageSrc: reader.result, activeSampleId: null });
+        setActiveIndex(idx);
+        onNotify(`Dropped screenshot onto Slide ${idx + 1}`);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemixLook = () => {
+    const bgPool = BACKGROUND_PRESETS.slice(0, 14);
+    const nextBg = bgPool[Math.floor(Math.random() * bgPool.length)] || BACKGROUND_PRESETS[0];
+    const patterns: BackdropPattern[] = ["spotlight", "dots", "grid", "rings"];
+    const nextPat = patterns[Math.floor(Math.random() * patterns.length)];
+    setBackgroundId(nextBg.id);
+    setPattern(nextPat);
+    onNotify(`Remixed backdrop: ${nextBg.name}`);
   };
 
   const handleSlideUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -538,7 +624,7 @@ export const CarouselBuilderView: React.FC<CarouselBuilderViewProps> = ({
               <div
                 key={s.id}
                 onClick={() => setActiveIndex(idx)}
-                className={`flex items-center justify-between gap-2 px-2.5 py-2 rounded-md border cursor-pointer transition-colors ${
+                className={`flex items-center justify-between gap-1.5 px-2.5 py-2 rounded-md border cursor-pointer transition-colors ${
                   activeIndex === idx
                     ? "bg-[#2563EB]/15 border-[#3B82F6]/60 text-white"
                     : "bg-[#141419] border-[#22222A] text-zinc-400 hover:text-zinc-200"
@@ -550,19 +636,58 @@ export const CarouselBuilderView: React.FC<CarouselBuilderViewProps> = ({
                   </div>
                   <div className="text-[10px] text-zinc-500">{s.frame}</div>
                 </div>
-                {slides.length > 3 && (
+                <div className="flex items-center gap-0.5 shrink-0">
                   <button
                     type="button"
+                    disabled={idx === 0}
                     onClick={(e) => {
                       e.stopPropagation();
-                      removeSlide(idx);
+                      moveSlide(idx, -1);
                     }}
-                    className="p-1 text-zinc-500 hover:text-red-400 cursor-pointer"
-                    title="Remove slide"
+                    className="p-0.5 text-zinc-500 hover:text-white disabled:opacity-30 cursor-pointer"
+                    title="Move earlier"
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
+                    <ChevronLeft className="w-3 h-3" />
                   </button>
-                )}
+                  <button
+                    type="button"
+                    disabled={idx === slides.length - 1}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      moveSlide(idx, 1);
+                    }}
+                    className="p-0.5 text-zinc-500 hover:text-white disabled:opacity-30 cursor-pointer"
+                    title="Move later"
+                  >
+                    <ChevronRight className="w-3 h-3" />
+                  </button>
+                  {slides.length < 5 && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        duplicateSlide(idx);
+                      }}
+                      className="p-0.5 text-zinc-500 hover:text-[#60A5FA] cursor-pointer"
+                      title="Duplicate slide"
+                    >
+                      <Copy className="w-3 h-3" />
+                    </button>
+                  )}
+                  {slides.length > 3 && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeSlide(idx);
+                      }}
+                      className="p-0.5 text-zinc-500 hover:text-red-400 cursor-pointer"
+                      title="Remove slide"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -619,7 +744,13 @@ export const CarouselBuilderView: React.FC<CarouselBuilderViewProps> = ({
       </aside>
 
       {/* Center Continuous Strip Preview */}
-      <section className="flex-1 flex flex-col min-w-0 studio-canvas-grid overflow-hidden">
+      <section
+        className={
+          isFullscreen
+            ? "fixed inset-0 z-50 flex flex-col bg-[#060608] overflow-hidden"
+            : "flex-1 flex flex-col min-w-0 studio-canvas-grid overflow-hidden"
+        }
+      >
         <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 border-b border-[#1E1E24] bg-[#0D0D10]/90">
           <div className="flex items-center gap-2 text-xs text-zinc-400">
             <Layers className="w-3.5 h-3.5 text-[#60A5FA]" />
@@ -632,6 +763,37 @@ export const CarouselBuilderView: React.FC<CarouselBuilderViewProps> = ({
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
+            {/* Fit All / Zoom Toggle so all slides can be seen at once */}
+            <div className="flex items-center gap-0.5 p-0.5 rounded-md bg-[#18181F] border border-[#282834]">
+              <ZoomIn className="w-3 h-3 text-zinc-400 ml-1.5 mr-0.5" />
+              {[
+                { label: "Fit", val: 0.55 as const },
+                { label: "78%", val: 0.78 as const },
+                { label: "100%", val: 1 as const },
+              ].map((z) => (
+                <button
+                  key={z.label}
+                  type="button"
+                  onClick={() => setStripZoom(z.val)}
+                  className={`px-2 py-1 rounded text-[11px] font-mono-tabular cursor-pointer transition-colors ${
+                    stripZoom === z.val
+                      ? "bg-[#2563EB] text-white"
+                      : "text-zinc-400 hover:text-zinc-200"
+                  }`}
+                >
+                  {z.label}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={handleRemixLook}
+              title="Remix backdrop gradient & pattern"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-[#18181F] hover:bg-[#22222C] border border-[#282834] text-xs font-medium text-zinc-200 cursor-pointer whitespace-nowrap"
+            >
+              <Shuffle className="w-3.5 h-3.5 text-[#60A5FA]" />
+              Remix
+            </button>
             <button
               type="button"
               onClick={() => setShowBrandHeader((v) => !v)}
@@ -679,29 +841,71 @@ export const CarouselBuilderView: React.FC<CarouselBuilderViewProps> = ({
               <Smartphone className="w-3.5 h-3.5 text-[#60A5FA]" />
               Phone Format
             </button>
+            {!isFullscreen && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setCropOpen(true)}
+                  title="Crop current slide screenshot so it fits cleanly inside the frame"
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-[#18181F] hover:bg-[#22222C] border border-[#282834] text-xs font-medium text-zinc-200 cursor-pointer whitespace-nowrap"
+                >
+                  <Crop className="w-3.5 h-3.5 text-[#60A5FA]" />
+                  Crop Slide
+                </button>
+                <button
+                  type="button"
+                  onClick={onOpenBrandKit}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-[#18181F] hover:bg-[#22222C] border border-[#282834] text-xs font-medium text-zinc-200 cursor-pointer whitespace-nowrap"
+                >
+                  <Palette className="w-3.5 h-3.5" style={{ color: brandKit.primaryColor }} />
+                  Brand Kit
+                </button>
+                <button
+                  type="button"
+                  disabled={isExportingAll}
+                  onClick={handleExportAllSlides}
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-md bg-[#2563EB] hover:bg-[#1D4ED8] text-xs font-semibold text-white cursor-pointer disabled:opacity-50 whitespace-nowrap"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  {isExportingAll ? "Exporting Slides..." : `Export All ${slides.length} Slides`}
+                </button>
+              </>
+            )}
             <button
               type="button"
-              onClick={onOpenBrandKit}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-[#18181F] hover:bg-[#22222C] border border-[#282834] text-xs font-medium text-zinc-200 cursor-pointer whitespace-nowrap"
+              onClick={() => setIsFullscreen((f) => !f)}
+              title={isFullscreen ? "Exit Fullscreen Preview (Esc)" : "Fullscreen Preview"}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs font-medium cursor-pointer whitespace-nowrap transition-colors ${
+                isFullscreen
+                  ? "bg-[#2563EB] border-[#3B82F6] text-white"
+                  : "bg-[#18181F] hover:bg-[#22222C] border-[#282834] text-zinc-200"
+              }`}
             >
-              <Palette className="w-3.5 h-3.5" style={{ color: brandKit.primaryColor }} />
-              Brand Kit
-            </button>
-            <button
-              type="button"
-              disabled={isExportingAll}
-              onClick={handleExportAllSlides}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-md bg-[#2563EB] hover:bg-[#1D4ED8] text-xs font-semibold text-white cursor-pointer disabled:opacity-50 whitespace-nowrap"
-            >
-              <Download className="w-3.5 h-3.5" />
-              {isExportingAll ? "Exporting Slides..." : `Export All ${slides.length} Slides`}
+              {isFullscreen ? (
+                <>
+                  <Minimize2 className="w-3.5 h-3.5" />
+                  Exit Fullscreen
+                </>
+              ) : (
+                <>
+                  <Maximize2 className="w-3.5 h-3.5 text-[#60A5FA]" />
+                  Fullscreen
+                </>
+              )}
             </button>
           </div>
         </div>
 
         {/* Horizontal Seamless Strip */}
         <div className="flex-1 overflow-auto studio-scroll p-6 flex items-center">
-          <div className="mx-auto flex items-center gap-1.5">
+          <div
+            className="mx-auto flex items-center gap-2 origin-left transition-transform duration-150"
+            style={
+              isExportingAll || stripZoom === 1
+                ? undefined
+                : { zoom: stripZoom }
+            }
+          >
             {slides.map((slide, idx) => {
               const isSelected = idx === activeIndex;
               const lightText = bgPreset.isDark;
@@ -709,8 +913,12 @@ export const CarouselBuilderView: React.FC<CarouselBuilderViewProps> = ({
                 <div
                   key={slide.id}
                   onClick={() => setActiveIndex(idx)}
+                  onDrop={(e) => handleDropOnSlide(idx, e)}
+                  onDragOver={(e) => e.preventDefault()}
                   className={`relative shrink-0 transition-all cursor-pointer ${
-                    isSelected
+                    isFullscreen
+                      ? ""
+                      : isSelected
                       ? "ring-2 ring-[#3B82F6] ring-offset-2 ring-offset-[#0D0D10]"
                       : "opacity-90 hover:opacity-100"
                   }`}
@@ -791,28 +999,134 @@ export const CarouselBuilderView: React.FC<CarouselBuilderViewProps> = ({
                       }}
                     >
                       {slide.frame === "iphone" ? (
-                        <div className="w-[178px] rounded-[28px] p-[7px] bg-gradient-to-b from-[#3A3D47] via-[#1B1D24] to-[#2B2E38] shadow-2xl border border-white/15">
-                          <div className="relative rounded-[22px] overflow-hidden bg-[#0B0D12] aspect-[9/16] flex flex-col">
-                            <div className="absolute top-2 left-1/2 -translate-x-1/2 z-20 w-14 h-3.5 rounded-full bg-black border border-white/10" />
-                            <div className="flex-1 overflow-hidden">
-                              {slide.activeSampleId ? (
-                                <LiveSceneRenderer
-                                  sampleId={slide.activeSampleId}
-                                  data={mockupData}
-                                  isExporting={isExportingAll}
-                                  onUpdateData={onUpdateMockupData}
-                                />
-                              ) : (
-                                <img
-                                  src={slide.imageSrc}
-                                  alt={`Slide ${idx + 1}`}
-                                  referrerPolicy="no-referrer"
-                                  className="w-full h-full object-cover block"
-                                />
+                        (() => {
+                          const isWideDesktop = slide.activeSampleId
+                            ? slide.activeSampleId !== "mobile"
+                            : (slideAspectMap[slide.id] ?? 1.6) > 1.12;
+                          const fitMode = slide.phoneFit ?? (isWideDesktop ? "showcase" : "pan");
+                          const panPct = slide.phonePanX ?? 50;
+                          const popWidth = Math.min(spec.width - 28, isWideDesktop ? 316 : 224);
+
+                          const renderSlideInner = (imgClass = "w-full h-auto block", imgStyle?: React.CSSProperties) =>
+                            slide.activeSampleId ? (
+                              <LiveSceneRenderer
+                                sampleId={slide.activeSampleId}
+                                data={mockupData}
+                                isExporting={isExportingAll}
+                                onUpdateData={onUpdateMockupData}
+                              />
+                            ) : (
+                              <img
+                                src={slide.imageSrc}
+                                alt={`Slide ${idx + 1}`}
+                                referrerPolicy="no-referrer"
+                                onLoad={(e) => {
+                                  const el = e.currentTarget;
+                                  if (el.naturalWidth > 0 && el.naturalHeight > 0) {
+                                    const ratio = el.naturalWidth / el.naturalHeight;
+                                    setSlideAspectMap((prev) =>
+                                      prev[slide.id] === ratio ? prev : { ...prev, [slide.id]: ratio }
+                                    );
+                                  }
+                                }}
+                                style={imgStyle}
+                                className={imgClass}
+                              />
+                            );
+
+                          return (
+                            <div className="relative flex items-center justify-center">
+                              <div className="w-[218px] rounded-[30px] p-[8px] bg-gradient-to-b from-[#3A3D47] via-[#1B1D24] to-[#2B2E38] shadow-2xl border border-white/15">
+                                <div className="relative rounded-[23px] overflow-hidden bg-[#0B0D12] aspect-[9/16] flex flex-col justify-center">
+                                  <div className="absolute top-2 left-1/2 -translate-x-1/2 z-20 w-16 h-4 rounded-full bg-black border border-white/10" />
+
+                                  {/* Ambient blurred echo for desktop media */}
+                                  {isWideDesktop && !slide.activeSampleId && (
+                                    <img
+                                      src={slide.imageSrc}
+                                      alt=""
+                                      aria-hidden="true"
+                                      className="pointer-events-none absolute inset-0 w-full h-full object-cover opacity-35 blur-md scale-125"
+                                    />
+                                  )}
+                                  {isWideDesktop && slide.activeSampleId && (
+                                    <div
+                                      aria-hidden="true"
+                                      className="pointer-events-none absolute inset-0 opacity-45"
+                                      style={{
+                                        background: `radial-gradient(circle at 30% 25%, ${brandKit.primaryColor}66 0%, transparent 55%), radial-gradient(circle at 75% 75%, ${brandKit.secondaryAccent}44 0%, transparent 60%)`,
+                                      }}
+                                    />
+                                  )}
+
+                                  <div className="relative z-10 flex-1 overflow-hidden flex items-center justify-center">
+                                    {!isWideDesktop ? (
+                                      renderSlideInner("w-full h-full object-cover block")
+                                    ) : fitMode === "pan" ? (
+                                      slide.activeSampleId ? (
+                                        <div className="w-full h-full overflow-hidden flex items-center">
+                                          <div
+                                            className="w-[410px] shrink-0 origin-left"
+                                            style={{
+                                              transform: `translateX(-${Math.round((panPct / 100) * 195)}px) scale(0.86)`,
+                                            }}
+                                          >
+                                            {renderSlideInner()}
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        renderSlideInner("w-full h-full object-cover block", {
+                                          objectPosition: `${panPct}% 50%`,
+                                        })
+                                      )
+                                    ) : fitMode === "fit" ? (
+                                      <div className="w-full px-1.5">
+                                        <div className="rounded-lg overflow-hidden border border-white/20 shadow-xl bg-[#0B0D12]">
+                                          {slide.activeSampleId ? (
+                                            <div className="w-[380px] origin-top-left" style={{ transform: "scale(0.49)", marginBottom: "-52%" }}>
+                                              {renderSlideInner()}
+                                            </div>
+                                          ) : (
+                                            renderSlideInner()
+                                          )}
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div className="mt-auto mb-3 text-[8px] font-mono-tabular text-white/45">
+                                        {brandKit.brandName || "Desktop"}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Pop-Out Wide Desktop Card over Phone Bezel */}
+                              {isWideDesktop && fitMode === "showcase" && (
+                                <div
+                                  className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-30 rounded-xl overflow-hidden border border-white/25 bg-[#0B0D12]"
+                                  style={{
+                                    width: `${popWidth}px`,
+                                    boxShadow: "0 22px 48px -10px rgba(0,0,0,0.85)",
+                                  }}
+                                >
+                                  {showBrandHeader && (
+                                    <div className="px-2.5 py-1 bg-[#191B22] border-b border-white/10 flex items-center gap-1">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-[#FF5F56]" />
+                                      <span className="w-1.5 h-1.5 rounded-full bg-[#FFBD2E]" />
+                                      <span className="w-1.5 h-1.5 rounded-full bg-[#27C93F]" />
+                                      <span className="ml-1.5 text-[8px] font-mono-tabular text-zinc-400 truncate">
+                                        {brandKit.domainBadge}
+                                      </span>
+                                    </div>
+                                  )}
+                                  <div className="max-h-[245px] overflow-hidden">
+                                    {renderSlideInner()}
+                                  </div>
+                                </div>
                               )}
                             </div>
-                          </div>
-                        </div>
+                          );
+                        })()
                       ) : (
                         <div className="w-full rounded-xl overflow-hidden border border-white/15 bg-[#0B0D12] shadow-2xl">
                           {showBrandHeader && slide.frame !== "none" && slide.frame !== "glass" && (
@@ -825,7 +1139,7 @@ export const CarouselBuilderView: React.FC<CarouselBuilderViewProps> = ({
                               </span>
                             </div>
                           )}
-                          <div className="max-h-[260px] overflow-hidden">
+                          <div className="max-h-[260px] overflow-hidden relative">
                             {slide.activeSampleId ? (
                               <LiveSceneRenderer
                                 sampleId={slide.activeSampleId}
@@ -841,7 +1155,31 @@ export const CarouselBuilderView: React.FC<CarouselBuilderViewProps> = ({
                                 className="w-full h-auto block"
                               />
                             )}
+                            {slide.spotlightEnabled && (
+                              <div
+                                className="pointer-events-none absolute w-12 h-12 -ml-6 -mt-6 rounded-full border-2 shadow-xl"
+                                style={{
+                                  left: `${(slide.spotlightX ?? 0.58) * 100}%`,
+                                  top: `${(slide.spotlightY ?? 0.44) * 100}%`,
+                                  borderColor: brandKit.secondaryAccent || "#60A5FA",
+                                  backgroundColor: `${brandKit.primaryColor}30`,
+                                  boxShadow: `0 0 0 4px ${brandKit.primaryColor}25`,
+                                }}
+                              />
+                            )}
                           </div>
+                        </div>
+                      )}
+
+                      {slide.badgeText && slide.badgeText.trim() && (
+                        <div
+                          className="absolute -top-2.5 -right-1 z-30 px-2.5 py-1 rounded-lg text-[10px] font-bold text-white shadow-xl border"
+                          style={{
+                            background: "rgba(13, 16, 26, 0.92)",
+                            borderColor: brandKit.secondaryAccent || "#60A5FA",
+                          }}
+                        >
+                          {slide.badgeText}
                         </div>
                       )}
                     </div>
@@ -868,7 +1206,7 @@ export const CarouselBuilderView: React.FC<CarouselBuilderViewProps> = ({
       </section>
 
       {/* Right Slide Inspector */}
-      <aside className="w-full lg:w-[264px] shrink-0 border-t lg:border-t-0 lg:border-l border-[#1E1E24] bg-[#101014] p-4 space-y-4 overflow-y-auto studio-scroll">
+      <aside className="w-full lg:w-[264px] shrink-0 border-t lg:border-t-0 lg:border-l border-[#1E1E24] bg-[#101014] p-4 pb-24 space-y-4 overflow-y-auto studio-scroll">
         <div className="flex items-center justify-between">
           <span className="text-xs font-semibold text-white">
             Editing Slide {activeIndex + 1}
@@ -900,14 +1238,49 @@ export const CarouselBuilderView: React.FC<CarouselBuilderViewProps> = ({
           onChange={handleSlideUpload}
           className="hidden"
         />
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg bg-[#181820] hover:bg-[#22222C] border border-[#282834] text-xs font-medium text-zinc-100 cursor-pointer"
-        >
-          <Upload className="w-3.5 h-3.5 text-[#60A5FA]" />
-          Upload Slide Image
-        </button>
+        <div className="grid grid-cols-1 gap-1.5">
+          <button
+            type="button"
+            onClick={() => {
+              if (isPreviewLocked && onRequireAuthForUpload) {
+                onRequireAuthForUpload();
+                return;
+              }
+              fileInputRef.current?.click();
+            }}
+            className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg bg-[#181820] hover:bg-[#22222C] border border-[#282834] text-xs font-medium text-zinc-100 cursor-pointer"
+          >
+            {isPreviewLocked ? (
+              <Lock className="w-3.5 h-3.5 text-amber-400" />
+            ) : (
+              <Upload className="w-3.5 h-3.5 text-[#60A5FA]" />
+            )}
+            {isPreviewLocked ? "Upload Slide Image (Sign In)" : "Upload Slide Image"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setCropOpen(true)}
+            className="w-full flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-md bg-[#16161C] hover:bg-[#20202A] border border-[#282834] text-[11px] font-medium text-zinc-200 cursor-pointer"
+          >
+            <Crop className="w-3.5 h-3.5 text-[#60A5FA]" />
+            Crop & Auto-Fit Slide Image
+          </button>
+          {activeStudioImageSrc && (
+            <button
+              type="button"
+              onClick={() => {
+                updateSlide(activeIndex, {
+                  imageSrc: activeStudioImageSrc,
+                  activeSampleId: null,
+                });
+                onNotify(`Synced Studio screenshot onto Slide ${activeIndex + 1}`);
+              }}
+              className="w-full py-1.5 px-3 rounded-md bg-[#2563EB]/15 hover:bg-[#2563EB]/25 border border-[#3B82F6]/40 text-[11px] font-medium text-blue-200 cursor-pointer"
+            >
+              Use Active Studio Screenshot
+            </button>
+          )}
+        </div>
 
         <div>
           <span className="block text-[11px] text-zinc-400 mb-1.5">Or Live Scene</span>
@@ -935,7 +1308,19 @@ export const CarouselBuilderView: React.FC<CarouselBuilderViewProps> = ({
         </div>
 
         <div>
-          <span className="block text-[11px] text-zinc-400 mb-1.5">Slide Frame</span>
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[11px] text-zinc-400">Slide Frame</span>
+            <button
+              type="button"
+              onClick={() => {
+                setSlides((prev) => prev.map((s) => ({ ...s, frame: activeSlide.frame })));
+                onNotify(`Applied ${activeSlide.frame} frame to all slides`);
+              }}
+              className="text-[10px] text-[#60A5FA] hover:text-white cursor-pointer"
+            >
+              Apply to All
+            </button>
+          </div>
           <div className="grid grid-cols-3 gap-1">
             {(["macos-dark", "browser", "iphone", "glass", "none"] as FrameType[]).map((fr) => (
               <button
@@ -953,6 +1338,67 @@ export const CarouselBuilderView: React.FC<CarouselBuilderViewProps> = ({
             ))}
           </div>
         </div>
+
+        {activeSlide.frame === "iphone" && (
+          <div className="space-y-2 pt-1 border-t border-[#1E1E24]">
+            <div className="flex items-center justify-between text-[11px] text-zinc-300">
+              <span className="font-semibold">Desktop SS in Phone</span>
+              <button
+                type="button"
+                onClick={() => {
+                  const fit = activeSlide.phoneFit ?? "showcase";
+                  setSlides((prev) =>
+                    prev.map((s) => ({ ...s, phoneFit: fit, phonePanX: activeSlide.phonePanX ?? 50 }))
+                  );
+                  onNotify("Applied phone screen fit to all slides");
+                }}
+                className="text-[10px] text-[#60A5FA] hover:text-white cursor-pointer"
+              >
+                Apply to All
+              </button>
+            </div>
+            <div className="grid grid-cols-3 gap-1">
+              {(
+                [
+                  { id: "showcase", label: "Pop-Out" },
+                  { id: "pan", label: "Fill & Pan" },
+                  { id: "fit", label: "Ambient Fit" },
+                ] as { id: PhoneFitMode; label: string }[]
+              ).map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => updateSlide(activeIndex, { phoneFit: opt.id })}
+                  className={`py-1.5 px-1 rounded text-[10px] font-medium border cursor-pointer whitespace-nowrap ${
+                    (activeSlide.phoneFit ?? "showcase") === opt.id
+                      ? "bg-[#2563EB]/20 border-[#3B82F6] text-white"
+                      : "bg-[#141419] border-[#22222A] text-zinc-400 hover:text-zinc-200"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            {(activeSlide.phoneFit ?? "showcase") === "pan" && (
+              <div>
+                <div className="flex items-center justify-between text-[10px] text-zinc-400 mb-1">
+                  <span>Horizontal Focus Pan</span>
+                  <span className="font-mono-tabular text-zinc-300">
+                    {activeSlide.phonePanX ?? 50}%
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={activeSlide.phonePanX ?? 50}
+                  onChange={(e) => updateSlide(activeIndex, { phonePanX: Number(e.target.value) })}
+                  className="studio-slider"
+                />
+              </div>
+            )}
+          </div>
+        )}
 
         <div>
           <div className="flex items-center justify-between text-[11px] text-zinc-400 mb-1">
@@ -993,7 +1439,109 @@ export const CarouselBuilderView: React.FC<CarouselBuilderViewProps> = ({
             Apply Size ({activeSlide.scale}%) to All Slides
           </button>
         </div>
+
+        <div className="h-px bg-[#1E1E24]" />
+
+        {/* Eye-Catch Callout Pill & Spotlight Highlight */}
+        <div className="space-y-2.5">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-semibold text-zinc-200">Floating Callout Badge</span>
+            {activeSlide.badgeText && (
+              <button
+                type="button"
+                onClick={() => updateSlide(activeIndex, { badgeText: "" })}
+                className="text-[10px] text-zinc-500 hover:text-zinc-200 cursor-pointer"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+          <input
+            type="text"
+            value={activeSlide.badgeText || ""}
+            onChange={(e) => updateSlide(activeIndex, { badgeText: e.target.value })}
+            placeholder="e.g. ⚡ +340% ROI"
+            className="w-full px-2.5 py-1.5 rounded-md bg-[#16161C] border border-[#24242E] text-xs text-zinc-100 placeholder-zinc-500"
+          />
+          <div className="flex flex-wrap gap-1">
+            {["⚡ +340% ROI", "★ 4.9 Rated", "PRO TIP", "LIVE DEMO"].map((chip) => (
+              <button
+                key={chip}
+                type="button"
+                onClick={() => updateSlide(activeIndex, { badgeText: chip })}
+                className="px-1.5 py-0.5 rounded bg-[#16161C] hover:bg-[#22222C] border border-[#262632] text-[10px] text-zinc-300 cursor-pointer"
+              >
+                {chip}
+              </button>
+            ))}
+          </div>
+
+          <label className="flex items-center justify-between text-xs text-zinc-300 cursor-pointer pt-1">
+            <span className="flex items-center gap-1.5">
+              <Crosshair className="w-3.5 h-3.5 text-[#60A5FA]" />
+              Spotlight Ring Target
+            </span>
+            <input
+              type="checkbox"
+              checked={Boolean(activeSlide.spotlightEnabled)}
+              onChange={(e) =>
+                updateSlide(activeIndex, {
+                  spotlightEnabled: e.target.checked,
+                  spotlightX: activeSlide.spotlightX ?? 0.58,
+                  spotlightY: activeSlide.spotlightY ?? 0.44,
+                })
+              }
+              className="accent-[#2563EB]"
+            />
+          </label>
+
+          {activeSlide.spotlightEnabled && (
+            <div
+              onClick={(e) => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                const sx = Math.max(0.08, Math.min(0.92, (e.clientX - rect.left) / rect.width));
+                const sy = Math.max(0.08, Math.min(0.92, (e.clientY - rect.top) / rect.height));
+                updateSlide(activeIndex, { spotlightX: sx, spotlightY: sy });
+              }}
+              className="relative rounded-md overflow-hidden border border-[#2C2C38] bg-[#07080C] cursor-crosshair aspect-video"
+              title="Click where to highlight"
+            >
+              <img
+                src={activeSlide.imageSrc}
+                alt="Spotlight target"
+                className="w-full h-full object-contain"
+              />
+              <span
+                className="absolute w-4 h-4 -ml-2 -mt-2 rounded-full border-2 border-[#60A5FA] bg-[#2563EB]/35 pointer-events-none"
+                style={{
+                  left: `${(activeSlide.spotlightX ?? 0.58) * 100}%`,
+                  top: `${(activeSlide.spotlightY ?? 0.44) * 100}%`,
+                }}
+              />
+            </div>
+          )}
+        </div>
       </aside>
+
+      <ImageCropModal
+        open={cropOpen}
+        imageSrc={activeSlide.imageSrc}
+        title={`Crop & Auto-Fit Slide ${activeIndex + 1}`}
+        targetFrameAspect={activeSlide.frame === "iphone" ? 9 / 16 : 16 / 10}
+        targetFrameLabel={activeSlide.frame === "iphone" ? "iPhone" : "Frame"}
+        onApplyCrop={(croppedUrl, croppedRatio) => {
+          updateSlide(activeIndex, {
+            imageSrc: croppedUrl,
+            activeSampleId: null,
+            scale: Math.min(96, Math.max(88, activeSlide.scale)),
+            ...(activeSlide.frame === "iphone"
+              ? { phoneFit: croppedRatio <= 1.08 ? "pan" : "fit", phonePanX: 50 }
+              : {}),
+          });
+          onNotify(`Cropped Slide ${activeIndex + 1} & auto-fitted into frame`);
+        }}
+        onClose={() => setCropOpen(false)}
+      />
     </div>
   );
 };

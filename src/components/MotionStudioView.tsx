@@ -13,7 +13,15 @@ import {
   Smartphone,
   Eye,
   EyeOff,
+  Shuffle,
+  Crosshair,
+  Sparkles,
+  Maximize2,
+  Minimize2,
+  Lock,
+  Crop,
 } from "lucide-react";
+import { ImageCropModal } from "./ImageCropModal";
 import { MOTION_CATEGORIES, MOTION_PRESETS } from "../data/motionPresets";
 import {
   BrandKit,
@@ -22,6 +30,7 @@ import {
   MotionDuration,
   MotionEasing,
   MotionPreset,
+  PhoneFitMode,
 } from "../types/studio";
 import { encodeGifFrames } from "../utils/gifEncoder";
 import { MOTION_ASPECT_DIMENSIONS, renderMotionFrame } from "../utils/motionRenderer";
@@ -33,6 +42,9 @@ interface MotionStudioViewProps {
   onUploadFile: (file: File) => void;
   onOpenBrandKit: () => void;
   onNotify: (msg: string, type?: "info" | "error") => void;
+  onApplyCroppedImage?: (croppedUrl: string, croppedRatio: number) => void;
+  isPreviewLocked?: boolean;
+  onRequireAuthForUpload?: () => void;
 }
 
 const EASING_OPTIONS: { id: MotionEasing; label: string }[] = [
@@ -50,6 +62,9 @@ export const MotionStudioView: React.FC<MotionStudioViewProps> = ({
   onUploadFile,
   onOpenBrandKit,
   onNotify,
+  onApplyCroppedImage,
+  isPreviewLocked = false,
+  onRequireAuthForUpload,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -61,6 +76,7 @@ export const MotionStudioView: React.FC<MotionStudioViewProps> = ({
   const [activePreset, setActivePreset] = useState<MotionPreset>(MOTION_PRESETS[0]);
   const [aspectId, setAspectId] = useState<MotionAspectId>("16:9");
   const [phoneFormatMode, setPhoneFormatMode] = useState(false);
+  const [phoneFitMode, setPhoneFitMode] = useState<PhoneFitMode>("showcase");
   const [mockupScale, setMockupScale] = useState(100);
   const [duration, setDuration] = useState<MotionDuration>(MOTION_PRESETS[0].defaultDuration);
   const [easing, setEasing] = useState<MotionEasing>(MOTION_PRESETS[0].defaultEasing);
@@ -70,9 +86,27 @@ export const MotionStudioView: React.FC<MotionStudioViewProps> = ({
   const [eyebrow, setEyebrow] = useState(MOTION_PRESETS[0].eyebrowDefault);
   const [headline, setHeadline] = useState(MOTION_PRESETS[0].headlineDefault);
   const [useBrandKit, setUseBrandKit] = useState(true);
+  const [cursorSpotlight, setCursorSpotlight] = useState(true);
+  const [zoomLoupe, setZoomLoupe] = useState(false);
+  const [focusX, setFocusX] = useState(0.58);
+  const [focusY, setFocusY] = useState(0.42);
+  const [floatingBadge, setFloatingBadge] = useState("⚡ +340% Faster");
+  const [ambientAura, setAmbientAura] = useState(true);
+  const [floorReflection, setFloorReflection] = useState(true);
 
   const [isPlaying, setIsPlaying] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [cropOpen, setCropOpen] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
+
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsFullscreen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isFullscreen]);
   const currentTimeRef = useRef(0);
   const startClockRef = useRef(0);
   const rafRef = useRef<number | null>(null);
@@ -152,21 +186,37 @@ export const MotionStudioView: React.FC<MotionStudioViewProps> = ({
         useBrandKit,
         mockupScale,
         showFrameHeader,
+        cursorSpotlight,
+        zoomLoupe,
+        focusX,
+        focusY,
+        floatingBadge,
+        floorReflection,
+        ambientAura,
+        phoneFitMode,
       });
     },
     [
+      ambientAura,
       brandKit,
+      cursorSpotlight,
       dims.height,
       dims.width,
       duration,
       easing,
       effectivePreset,
       eyebrow,
+      floatingBadge,
+      floorReflection,
+      focusX,
+      focusY,
       headline,
       mockupScale,
+      phoneFitMode,
       showFrameHeader,
       showHeadline,
       useBrandKit,
+      zoomLoupe,
     ]
   );
 
@@ -230,6 +280,26 @@ export const MotionStudioView: React.FC<MotionStudioViewProps> = ({
       setAspectId(next ? "9:16" : activePreset.defaultAspect || "16:9");
       return next;
     });
+  };
+
+  const handleRemixMotion = () => {
+    const pool = filteredPresets.length > 1 ? filteredPresets : MOTION_PRESETS;
+    const candidates = pool.filter((p) => p.id !== activePreset.id);
+    const pick = candidates[Math.floor(Math.random() * candidates.length)] || MOTION_PRESETS[0];
+    selectPreset(pick);
+    onNotify(`Remixed motion to "${pick.name}"`);
+  };
+
+  const handleDropFile = (e: React.DragEvent) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files?.[0];
+    if (file && file.type.startsWith("image/")) {
+      if (isPreviewLocked && onRequireAuthForUpload) {
+        onRequireAuthForUpload();
+        return;
+      }
+      onUploadFile(file);
+    }
   };
 
   const handleVideoExport = async (kind: "webm" | "mp4") => {
@@ -363,6 +433,14 @@ export const MotionStudioView: React.FC<MotionStudioViewProps> = ({
         useBrandKit,
         mockupScale,
         showFrameHeader,
+        cursorSpotlight,
+        zoomLoupe,
+        focusX,
+        focusY,
+        floatingBadge,
+        floorReflection,
+        ambientAura,
+        phoneFitMode,
       });
       frames.push(offCtx.getImageData(0, 0, gw, gh));
       setExportState({
@@ -399,9 +477,13 @@ export const MotionStudioView: React.FC<MotionStudioViewProps> = ({
   };
 
   return (
-    <div className="flex-1 flex flex-col lg:flex-row min-h-0 bg-[#0A0A0C]">
-      {/* Left Rail: 108 Motion Templates Browser */}
-      <aside className="w-full lg:w-[300px] shrink-0 border-b lg:border-b-0 lg:border-r border-[#1E1E24] bg-[#101014] flex flex-col min-h-0">
+    <div
+      className="flex-1 flex flex-col lg:flex-row min-h-0 bg-[#0A0A0C]"
+      onDrop={handleDropFile}
+      onDragOver={(e) => e.preventDefault()}
+    >
+      {/* Left Rail: Motion Templates Browser (shows below canvas on phones) */}
+      <aside className="order-2 lg:order-1 w-full lg:w-[300px] shrink-0 max-h-[260px] sm:max-h-[300px] lg:max-h-none border-t lg:border-t-0 lg:border-r border-[#1E1E24] bg-[#101014] flex flex-col min-h-0">
         <div className="p-4 border-b border-[#1E1E24] space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-xs font-semibold text-white tracking-wide">
@@ -458,9 +540,20 @@ export const MotionStudioView: React.FC<MotionStudioViewProps> = ({
                 }`}
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-semibold text-zinc-100 truncate">
-                    {preset.name}
-                  </span>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="flex items-center -space-x-1 shrink-0">
+                      {preset.backdropColors.slice(0, 3).map((hex, i) => (
+                        <span
+                          key={i}
+                          className="w-2.5 h-2.5 rounded-full border border-black/60"
+                          style={{ backgroundColor: hex }}
+                        />
+                      ))}
+                    </span>
+                    <span className="text-xs font-semibold text-zinc-100 truncate">
+                      {preset.name}
+                    </span>
+                  </div>
                   <span className="text-[10px] font-mono-tabular text-zinc-400 shrink-0">
                     {preset.defaultDuration}s
                   </span>
@@ -479,9 +572,15 @@ export const MotionStudioView: React.FC<MotionStudioViewProps> = ({
         </div>
       </aside>
 
-      {/* Center Stage: Live 60fps Canvas Player + Timeline */}
-      <section className="flex-1 flex flex-col min-w-0 studio-canvas-grid overflow-hidden">
-        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 border-b border-[#1E1E24] bg-[#0D0D10]/90">
+      {/* Center Stage: Live 60fps Canvas Player + Timeline (first on phones) */}
+      <section
+        className={
+          isFullscreen
+            ? "fixed inset-0 z-50 flex flex-col bg-[#060608] overflow-hidden"
+            : "order-1 lg:order-2 flex-1 flex flex-col min-w-0 studio-canvas-grid lg:overflow-hidden"
+        }
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-2.5 border-b border-[#1E1E24] bg-[#0D0D10]/95">
           <div className="flex items-center gap-2 text-xs text-zinc-400 min-w-0">
             <span className="font-semibold text-zinc-200 truncate">{activePreset.name}</span>
             <span aria-hidden="true">·</span>
@@ -489,10 +588,34 @@ export const MotionStudioView: React.FC<MotionStudioViewProps> = ({
               {dims.width}×{dims.height}
             </span>
             <span aria-hidden="true">·</span>
-            <span className="truncate hidden sm:inline">{imageName} (Ctrl+V supported)</span>
+            <span className="truncate hidden sm:inline">
+              {isFullscreen ? "Full Screen Preview (Esc to exit)" : `${imageName} (Ctrl+V supported)`}
+            </span>
           </div>
 
           <div className="flex items-center gap-2 shrink-0 flex-wrap">
+            <button
+              type="button"
+              onClick={() => setIsFullscreen((f) => !f)}
+              title={isFullscreen ? "Exit Full Screen (Esc)" : "Watch Motion Full Screen without exporting"}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs font-medium cursor-pointer whitespace-nowrap transition-colors ${
+                isFullscreen
+                  ? "bg-[#2563EB] border-[#3B82F6] text-white"
+                  : "bg-[#18181F] hover:bg-[#22222C] border-[#282834] text-zinc-200"
+              }`}
+            >
+              {isFullscreen ? (
+                <>
+                  <Minimize2 className="w-3.5 h-3.5" />
+                  Exit Fullscreen
+                </>
+              ) : (
+                <>
+                  <Maximize2 className="w-3.5 h-3.5 text-[#60A5FA]" />
+                  Fullscreen
+                </>
+              )}
+            </button>
             <button
               type="button"
               disabled={exportState.active}
@@ -532,6 +655,16 @@ export const MotionStudioView: React.FC<MotionStudioViewProps> = ({
             <button
               type="button"
               disabled={exportState.active}
+              onClick={handleRemixMotion}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-[#18181F] hover:bg-[#22222C] border border-[#282834] text-xs font-medium text-zinc-200 cursor-pointer whitespace-nowrap"
+              title="Pick a fresh eye-catching Motion template"
+            >
+              <Shuffle className="w-3.5 h-3.5 text-[#60A5FA]" />
+              Remix
+            </button>
+            <button
+              type="button"
+              disabled={exportState.active}
               onClick={togglePhoneFormat}
               className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs font-medium cursor-pointer whitespace-nowrap transition-colors ${
                 phoneFormatMode
@@ -543,48 +676,73 @@ export const MotionStudioView: React.FC<MotionStudioViewProps> = ({
               <Smartphone className="w-3.5 h-3.5 text-[#60A5FA]" />
               Phone Format
             </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) onUploadFile(file);
-                e.target.value = "";
-              }}
-              className="hidden"
-            />
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-[#18181F] hover:bg-[#22222C] border border-[#282834] text-xs font-medium text-zinc-200 cursor-pointer whitespace-nowrap"
-            >
-              <Upload className="w-3.5 h-3.5 text-[#60A5FA]" />
-              Replace Screenshot
-            </button>
-            <button
-              type="button"
-              onClick={onOpenBrandKit}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-[#18181F] hover:bg-[#22222C] border border-[#282834] text-xs font-medium text-zinc-200 cursor-pointer whitespace-nowrap"
-            >
-              <Palette className="w-3.5 h-3.5" style={{ color: brandKit.primaryColor }} />
-              Brand Kit
-            </button>
+            {!isFullscreen && (
+              <>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) onUploadFile(file);
+                    e.target.value = "";
+                  }}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isPreviewLocked && onRequireAuthForUpload) {
+                      onRequireAuthForUpload();
+                      return;
+                    }
+                    fileInputRef.current?.click();
+                  }}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-[#18181F] hover:bg-[#22222C] border border-[#282834] text-xs font-medium text-zinc-200 cursor-pointer whitespace-nowrap"
+                >
+                  {isPreviewLocked ? (
+                    <Lock className="w-3.5 h-3.5 text-amber-400" />
+                  ) : (
+                    <Upload className="w-3.5 h-3.5 text-[#60A5FA]" />
+                  )}
+                  {isPreviewLocked ? "Replace Screenshot (Sign In)" : "Replace Screenshot"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCropOpen(true)}
+                  title="Crop screenshot so it automatically fits inside the Motion frame"
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-[#18181F] hover:bg-[#22222C] border border-[#282834] text-xs font-medium text-zinc-200 cursor-pointer whitespace-nowrap"
+                >
+                  <Crop className="w-3.5 h-3.5 text-[#60A5FA]" />
+                  Crop
+                </button>
+                <button
+                  type="button"
+                  onClick={onOpenBrandKit}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-[#18181F] hover:bg-[#22222C] border border-[#282834] text-xs font-medium text-zinc-200 cursor-pointer whitespace-nowrap"
+                >
+                  <Palette className="w-3.5 h-3.5" style={{ color: brandKit.primaryColor }} />
+                  Brand Kit
+                </button>
+              </>
+            )}
           </div>
         </div>
 
         {/* Canvas Preview */}
-        <div className="flex-1 flex items-center justify-center p-4 sm:p-6 overflow-auto studio-scroll">
+        <div className="flex-1 flex items-center justify-center p-3 sm:p-6 overflow-auto studio-scroll">
           <canvas
             ref={canvasRef}
             width={dims.width}
             height={dims.height}
-            className="max-w-full max-h-[520px] w-auto h-auto rounded-lg border border-white/10 shadow-2xl bg-[#07080C]"
+            className={`max-w-full w-auto h-auto rounded-lg border border-white/10 shadow-2xl bg-[#07080C] ${
+              isFullscreen ? "max-h-[78vh] sm:max-h-[82vh]" : "max-h-[46vh] sm:max-h-[520px]"
+            }`}
           />
         </div>
 
         {/* Timeline Transport Bar */}
-        <div className="px-5 py-3 border-t border-[#1E1E24] bg-[#0D0D11] flex flex-wrap items-center gap-3">
+        <div className="px-3 sm:px-5 py-2.5 sm:py-3 border-t border-[#1E1E24] bg-[#0D0D11] flex flex-wrap items-center gap-2 sm:gap-3">
           <button
             type="button"
             disabled={exportState.active}
@@ -642,7 +800,7 @@ export const MotionStudioView: React.FC<MotionStudioViewProps> = ({
               currentTimeRef.current = v;
               setCurrentTime(v);
             }}
-            className="studio-slider flex-1 min-w-[140px]"
+            className="studio-slider flex-1 min-w-[100px] sm:min-w-[140px]"
           />
 
           <span className="text-xs font-mono-tabular text-zinc-300 w-24 text-right shrink-0">
@@ -652,7 +810,7 @@ export const MotionStudioView: React.FC<MotionStudioViewProps> = ({
       </section>
 
       {/* Right Rail: Motion Controls & Export */}
-      <aside className="w-full lg:w-[276px] shrink-0 border-t lg:border-t-0 lg:border-l border-[#1E1E24] bg-[#101014] flex flex-col justify-between overflow-y-auto studio-scroll">
+      <aside className="order-3 w-full lg:w-[276px] shrink-0 border-t lg:border-t-0 lg:border-l border-[#1E1E24] bg-[#101014] flex flex-col justify-between overflow-y-auto studio-scroll">
         <div className="p-4 space-y-5">
           <div>
             <h3 className="text-xs font-semibold text-zinc-200 mb-2">Duration</h3>
@@ -687,13 +845,45 @@ export const MotionStudioView: React.FC<MotionStudioViewProps> = ({
             <input
               type="range"
               min={55}
-              max={140}
+              max={145}
               disabled={exportState.active}
               value={mockupScale}
               onChange={(e) => setMockupScale(Number(e.target.value))}
               className="studio-slider"
             />
           </div>
+
+          {(phoneFormatMode || effectivePreset.frameStyle === "iphone") && (
+            <div className="space-y-1.5 pt-1">
+              <div className="flex items-center justify-between text-[11px] text-zinc-300">
+                <span className="font-semibold">Desktop SS in Phone</span>
+                <span className="text-[10px] text-zinc-500">Wide Fix</span>
+              </div>
+              <div className="grid grid-cols-3 gap-1">
+                {(
+                  [
+                    { id: "showcase", label: "Pop-Out" },
+                    { id: "fit", label: "Full Card" },
+                    { id: "pan", label: "Fill & Pan" },
+                  ] as { id: PhoneFitMode; label: string }[]
+                ).map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    disabled={exportState.active}
+                    onClick={() => setPhoneFitMode(opt.id)}
+                    className={`py-1.5 px-1 rounded-md text-[10.5px] font-medium border cursor-pointer whitespace-nowrap transition-colors ${
+                      phoneFitMode === opt.id
+                        ? "bg-[#2563EB]/20 border-[#3B82F6] text-white"
+                        : "bg-[#141419] border-[#22222A] text-zinc-400 hover:text-zinc-200"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div>
             <h3 className="text-xs font-semibold text-zinc-200 mb-2">Aspect Ratio</h3>
@@ -789,10 +979,138 @@ export const MotionStudioView: React.FC<MotionStudioViewProps> = ({
               </div>
             )}
           </div>
+
+          <div className="h-px bg-[#1E1E24]" />
+
+          {/* Eye-Catch FX (Unique Cursor + Zoom Loupe + Floating Stat Badge) */}
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between">
+              <h3 className="flex items-center gap-1.5 text-xs font-semibold text-white">
+                <Sparkles className="w-3.5 h-3.5 text-[#60A5FA]" />
+                Eye-Catch FX
+              </h3>
+              <button
+                type="button"
+                onClick={() => {
+                  const next = !(cursorSpotlight || zoomLoupe || Boolean(floatingBadge));
+                  setCursorSpotlight(next);
+                  setZoomLoupe(next);
+                  setAmbientAura(next);
+                  setFloorReflection(next);
+                  setFloatingBadge(next ? "⚡ +340% Faster" : "");
+                }}
+                className="text-[10px] text-[#60A5FA] hover:text-white cursor-pointer"
+              >
+                {cursorSpotlight || zoomLoupe ? "Clean Mode" : "Pro Pop"}
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-zinc-300">Animated Cursor Click</span>
+              <input
+                type="checkbox"
+                checked={cursorSpotlight}
+                onChange={(e) => setCursorSpotlight(e.target.checked)}
+                className="accent-[#2563EB] cursor-pointer"
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-zinc-300">1.85× Magnifier Loupe</span>
+              <input
+                type="checkbox"
+                checked={zoomLoupe}
+                onChange={(e) => setZoomLoupe(e.target.checked)}
+                className="accent-[#2563EB] cursor-pointer"
+              />
+            </div>
+
+            {(cursorSpotlight || zoomLoupe) && (
+              <div className="space-y-1.5 pt-0.5">
+                <div className="flex items-center justify-between text-[10px] text-zinc-400">
+                  <span className="flex items-center gap-1">
+                    <Crosshair className="w-3 h-3 text-[#60A5FA]" />
+                    Click target on screenshot
+                  </span>
+                  <span className="font-mono-tabular">
+                    {Math.round(focusX * 100)}%, {Math.round(focusY * 100)}%
+                  </span>
+                </div>
+                <div
+                  onClick={(e) => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setFocusX(Math.max(0.08, Math.min(0.92, (e.clientX - rect.left) / rect.width)));
+                    setFocusY(Math.max(0.08, Math.min(0.92, (e.clientY - rect.top) / rect.height)));
+                  }}
+                  className="relative rounded-md overflow-hidden border border-[#2C2C38] bg-[#07080C] cursor-crosshair aspect-video"
+                >
+                  <img src={imageSrc} alt="Focus target" className="w-full h-full object-contain" />
+                  <span
+                    className="absolute w-4 h-4 -ml-2 -mt-2 rounded-full border-2 border-[#60A5FA] bg-[#2563EB]/35 shadow-lg pointer-events-none"
+                    style={{ left: `${focusX * 100}%`, top: `${focusY * 100}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-[11px] text-zinc-300">
+                <span>Floating 3D Stat Pill</span>
+                {floatingBadge && (
+                  <button
+                    type="button"
+                    onClick={() => setFloatingBadge("")}
+                    className="text-[10px] text-zinc-500 hover:text-zinc-200 cursor-pointer"
+                  >
+                    Hide
+                  </button>
+                )}
+              </div>
+              <input
+                type="text"
+                value={floatingBadge}
+                onChange={(e) => setFloatingBadge(e.target.value)}
+                placeholder="e.g. ⚡ +340% Conversion (blank to hide)"
+                className="w-full px-2.5 py-1.5 rounded-md bg-[#16161C] border border-[#24242E] text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-[#3B82F6]"
+              />
+              <div className="flex flex-wrap gap-1">
+                {["⚡ +340% Faster", "★ 4.9 Rated", "10x Launch", "New v2.0"].map((chip) => (
+                  <button
+                    key={chip}
+                    type="button"
+                    onClick={() => setFloatingBadge(chip)}
+                    className="px-1.5 py-0.5 rounded bg-[#16161C] hover:bg-[#22222C] border border-[#262632] text-[10px] text-zinc-300 cursor-pointer"
+                  >
+                    {chip}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-zinc-300">Ambient Aura Glow</span>
+              <input
+                type="checkbox"
+                checked={ambientAura}
+                onChange={(e) => setAmbientAura(e.target.checked)}
+                className="accent-[#2563EB] cursor-pointer"
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-zinc-300">Stage Floor Reflection</span>
+              <input
+                type="checkbox"
+                checked={floorReflection}
+                onChange={(e) => setFloorReflection(e.target.checked)}
+                className="accent-[#2563EB] cursor-pointer"
+              />
+            </div>
+          </div>
         </div>
 
-        {/* Browser Export Actions */}
-        <div className="p-4 border-t border-[#1E1E24] bg-[#0D0D11] space-y-2">
+        {/* Browser Export Actions (bottom safe clearance for host preview badges) */}
+        <div className="p-4 pb-20 border-t border-[#1E1E24] bg-[#0D0D11] space-y-2">
           {exportState.active ? (
             <button
               type="button"
@@ -834,6 +1152,23 @@ export const MotionStudioView: React.FC<MotionStudioViewProps> = ({
           )}
         </div>
       </aside>
+
+      <ImageCropModal
+        open={cropOpen}
+        imageSrc={imageSrc}
+        title="Crop & Auto-Fit Motion Screenshot"
+        targetFrameAspect={effectivePreset.frameStyle === "iphone" ? 0.495 : 16 / 10}
+        targetFrameLabel={effectivePreset.frameStyle === "iphone" ? "iPhone" : "Frame"}
+        onApplyCrop={(croppedUrl, croppedRatio) => {
+          onApplyCroppedImage?.(croppedUrl, croppedRatio);
+          setMockupScale(100);
+          if (phoneFormatMode || effectivePreset.frameStyle === "iphone") {
+            setPhoneFitMode(croppedRatio <= 1.08 ? "pan" : "fit");
+          }
+          onNotify("Cropped & auto-fitted screenshot into Motion frame");
+        }}
+        onClose={() => setCropOpen(false)}
+      />
     </div>
   );
 };
